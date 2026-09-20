@@ -1,0 +1,33 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Runtime data and artifacts
+data/uploads/
+data/artifacts/
+data/*.db
+data/*.sqlite*
+*.db
+*.sqlite*
+model-cache/
+checkpoints/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
