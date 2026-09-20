@@ -1,0 +1,1 @@
+"""SatQuery FastAPI application package."""
