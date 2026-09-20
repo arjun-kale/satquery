@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+:root {
+  --bg-base: #0A0E14;
+  --bg-surface: #121821;
+  --bg-surface-2: #1B222D;
+  --border-subtle: #232B38;
+  --border-default: #2E3846;
+  --text-primary: #E6EAF0;
+  --text-secondary: #9AA5B4;
+  --text-muted: #616E80;
+  --accent-optical: #22D3EE;
+  --accent-sar: #C084FC;
+  --status-success: #4ADE80;
+  --status-warning: #FBBF24;
+  --status-critical: #F87171;
+  --radius-card: 8px;
+  --radius-pill: 4px;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg-base); }
+body { min-height: 100vh; margin: 0; background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans); }
+button, input { font: inherit; }
+
+.workspace { margin: 0 auto; max-width: 1200px; padding: 32px 24px; }
+.topbar { align-items: center; display: flex; justify-content: space-between; gap: 24px; }
+h1, h2, p { margin-top: 0; }
+h1 { font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 600; letter-spacing: -0.03em; }
+h2 { font-size: 1.25rem; font-weight: 600; }
+.eyebrow { color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; }
+.empty-state { border: 1px solid var(--border-default); border-radius: var(--radius-card); margin-top: 64px; max-width: 680px; padding: 28px; }
+.empty-state p:not(.eyebrow) { color: var(--text-secondary); line-height: 1.6; margin-bottom: 0; }
+.status { align-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-pill); color: var(--text-secondary); display: inline-flex; font-family: var(--font-mono); font-size: 0.75rem; gap: 8px; padding: 7px 9px; white-space: nowrap; }
+.status span { background: var(--status-warning); border-radius: 50%; height: 7px; width: 7px; }
+.status.online span { background: var(--status-success); }
+.status.offline span { background: var(--status-critical); }
+
+@media (max-width: 640px) { .topbar { align-items: flex-start; flex-direction: column; } }
