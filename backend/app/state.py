@@ -20,7 +20,7 @@ class InvalidJobTransition(ValueError):
 ALLOWED_TRANSITIONS: dict[JobStatus, set[JobStatus]] = {
     JobStatus.RECEIVED: {JobStatus.VALIDATED, JobStatus.REJECTED, JobStatus.FAILED},
     JobStatus.VALIDATED: {JobStatus.ROUTING, JobStatus.REJECTED, JobStatus.FAILED},
-    JobStatus.ROUTING: {JobStatus.EXECUTING, JobStatus.FAILED},
+    JobStatus.ROUTING: {JobStatus.EXECUTING, JobStatus.REJECTED, JobStatus.FAILED},
     JobStatus.EXECUTING: {JobStatus.COMPLETED, JobStatus.FAILED},
     JobStatus.COMPLETED: set(),
     JobStatus.REJECTED: set(),
