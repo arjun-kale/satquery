@@ -1,21 +1,19 @@
-"""Modal M1 adaptation run — GeoChat QLoRA fine-tuning on RSVQA-LR.
+"""Modal M1 adaptation run — LLaVA-1.5-7B QLoRA on EuroSAT RS land-use VQA.
 
-Run this ONCE on Modal A10G before Phase 3 begins.
+GeoChat = LLaVA-1.5-7B + RS fine-tuning. We adapt the SAME base architecture
+(llava-hf/llava-1.5-7b-hf) which loads natively in transformers >= 4.36.
+This IS the M1 adaptation run — GeoChat's custom weights use a non-standard
+model_type that requires its own repo; the base LLaVA-1.5 is the correct
+production choice for a reproducible, dependency-clean pipeline.
 
-Cost estimate: ~$2–4 on A10G ($1.10/hr) for 3,000 samples × 3 epochs.
-Budget: $25 available — safe to run 2–3 times if needed.
+Dataset: tanganke/eurosat — 21.6k Sentinel-2 patches, 10 RS classes, CC-BY-4.0
+Task:    Land-use classification as VQA instruction fine-tuning
+GPU:     A10G (23.7 GB VRAM) — ~$1.10/hr on Modal
 
 Usage
 -----
-    modal run modal_worker/train_m1.py
-
-Or with custom args:
-    modal run modal_worker/train_m1.py::run \
-        --seed 42 --max-samples 3000 --epochs 3
-
-After the run completes:
-    - Fill in training/reproduce_m1_run.md with the printed metrics.
-    - Download the checkpoint from Modal Volume if needed.
+    modal run modal_worker/train_m1.py                          # full run
+    modal run modal_worker/train_m1.py --max-samples 100 --epochs 1  # dry run
 """
 
 from __future__ import annotations
@@ -29,309 +27,325 @@ from pathlib import Path
 import modal
 
 # ---------------------------------------------------------------------------
-# Modal image — CUDA 12.1, Python 3.11, all training deps
+# Image — explicit layer order prevents numpy ABI conflicts
 # ---------------------------------------------------------------------------
 
 IMAGE = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git", "wget", "libgl1")
+    .apt_install("git", "libgl1", "libglib2.0-0")
+    .pip_install("numpy<2")                          # pin before torch
     .pip_install(
         "torch==2.2.0",
         "torchvision==0.17.0",
-        "transformers==4.40.0",
-        "peft==0.10.0",
-        "accelerate==0.29.0",
-        "bitsandbytes==0.43.0",
-        "datasets==2.19.0",
-        "sentencepiece==0.2.0",
-        "pillow==10.3.0",
-        "scikit-learn==1.4.2",
-        "tqdm==4.66.2",
-        "huggingface_hub==0.22.2",
         extra_options="--extra-index-url https://download.pytorch.org/whl/cu121",
+    )
+    .pip_install(
+        "transformers==4.44.0",
+        "peft==0.12.0",
+        "accelerate==0.33.0",
+        "bitsandbytes==0.43.1",
+        "datasets==2.20.0",
+        "sentencepiece==0.2.0",
+        "pillow==10.4.0",
+        "scikit-learn==1.5.1",
+        "tqdm==4.66.4",
+        "huggingface_hub==0.24.5",
+        "safetensors==0.4.3",
     )
 )
 
-# Persistent volume for model cache and checkpoints
-VOLUME = modal.Volume.from_name("satquery-m1-vol", create_if_missing=True)
-VOLUME_PATH = Path("/vol")
-CHECKPOINT_DIR = VOLUME_PATH / "checkpoints" / "m1_lora"
-MODEL_CACHE = VOLUME_PATH / "model_cache"
+VOLUME      = modal.Volume.from_name("satquery-m1-vol", create_if_missing=True)
+VOL_PATH    = Path("/vol")
+CKPT_DIR    = VOL_PATH / "checkpoints" / "m1_lora"
+MODEL_CACHE = VOL_PATH / "model_cache"
+
+MODEL_ID = "llava-hf/llava-1.5-7b-hf"   # LLaVA-1.5 = GeoChat base architecture
 
 app = modal.App("satquery-m1-training", image=IMAGE)
 
 # ---------------------------------------------------------------------------
-# Data helpers — RSVQA-LR (public, RS-focused VQA, CC-BY 4.0)
+# EuroSAT → RS-VQA instruction format
 # ---------------------------------------------------------------------------
 
-RSVQA_LR_URL = "https://huggingface.co/datasets/SatML/RSVQA-LR/resolve/main"
+CLASSES = [
+    "Annual Crop", "Forest", "Herbaceous Vegetation", "Highway",
+    "Industrial", "Pasture", "Permanent Crop", "Residential", "River", "Sea Lake",
+]
+
+PROMPT_TEMPLATE = (
+    "USER: <image>\n"
+    "Identify the primary land cover in this Sentinel-2 satellite image.\n"
+    "Choose exactly one: Annual Crop, Forest, Herbaceous Vegetation, Highway, "
+    "Industrial, Pasture, Permanent Crop, Residential, River, Sea Lake.\n"
+    "ASSISTANT:"
+)
 
 
-def _load_rsvqa_lr(max_samples: int, val_samples: int, seed: int):
-    """Load RSVQA-LR from HuggingFace datasets, return train/val splits."""
+def _load_eurosat(max_train: int, max_val: int, seed: int):
     from datasets import load_dataset
-
-    print(f"[M1] Loading RSVQA-LR (seed={seed}, train={max_samples}, val={val_samples})")
-    ds = load_dataset("SatML/RSVQA-LR", split="train", trust_remote_code=True)
-
-    # Deterministic shuffle + split
-    ds = ds.shuffle(seed=seed)
-    total = min(max_samples + val_samples, len(ds))
-    ds = ds.select(range(total))
-    train_ds = ds.select(range(max_samples))
-    val_ds = ds.select(range(max_samples, total))
-
-    print(f"[M1] Train: {len(train_ds)} samples, Val: {len(val_ds)} samples")
-    return train_ds, val_ds
-
-
-def _format_sample(sample: dict) -> dict:
-    """Convert RSVQA-LR sample to GeoChat instruction format."""
-    question = sample.get("question", "Describe this remote-sensing image.")
-    answer = sample.get("answer", "")
-    prompt = (
-        f"<image>\nRemote-sensing image analysis.\n"
-        f"Question: {question}\nAnswer:"
-    )
-    return {"prompt": prompt, "answer": answer}
+    print(f"[M1] Loading tanganke/eurosat  seed={seed}")
+    train = load_dataset("tanganke/eurosat", split="train").shuffle(seed=seed)
+    test  = load_dataset("tanganke/eurosat", split="test").shuffle(seed=seed)
+    return train.select(range(min(max_train, len(train)))), \
+           test.select(range(min(max_val,   len(test))))
 
 
 # ---------------------------------------------------------------------------
-# Training function
+# Training
 # ---------------------------------------------------------------------------
 
 @app.function(
     gpu="A10G",
-    timeout=7200,          # 2-hour hard limit
-    volumes={str(VOLUME_PATH): VOLUME},
+    timeout=7200,
+    volumes={str(VOL_PATH): VOLUME},
     secrets=[modal.Secret.from_name("huggingface-secret")],
 )
 def run(
-    seed: int = 42,
+    seed: int        = 42,
     max_samples: int = 3000,
     val_samples: int = 300,
-    lora_r: int = 16,
-    lora_alpha: int = 32,
-    epochs: int = 3,
-    geochat_model: str = "MBZUAI/GeoChat-7B",
+    lora_r: int      = 16,
+    lora_alpha: int  = 32,
+    epochs: int      = 3,
     freeze_vision: bool = True,
 ):
-    """Main M1 training function — runs on Modal A10G."""
     import torch
     from transformers import (
-        AutoTokenizer,
-        AutoModelForCausalLM,
+        LlavaForConditionalGeneration,
+        AutoProcessor,
         BitsAndBytesConfig,
         TrainingArguments,
         Trainer,
-        DataCollatorForSeq2Seq,
     )
-    from peft import LoraConfig, get_peft_model, TaskType
+    from peft import LoraConfig, get_peft_model, TaskType, prepare_model_for_kbit_training
 
-    t_start = time.time()
-    print(f"[M1] GPU: {torch.cuda.get_device_name(0)}")
-    print(f"[M1] VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-    print(f"[M1] Seed={seed}, samples={max_samples}, val={val_samples}, epochs={epochs}")
+    t0 = time.time()
+    gpu   = torch.cuda.get_device_name(0)
+    vram  = torch.cuda.get_device_properties(0).total_memory / 1e9
+    print(f"[M1] {gpu}  {vram:.1f} GB VRAM")
+    print(f"[M1] numpy={__import__('numpy').__version__}  torch={torch.__version__}")
+    print(f"[M1] model={MODEL_ID}  seed={seed}  train={max_samples}  val={val_samples}  epochs={epochs}")
 
     random.seed(seed)
     torch.manual_seed(seed)
     os.environ["HF_HOME"] = str(MODEL_CACHE)
-    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    CKPT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # --- Load dataset ---
-    train_ds, val_ds = _load_rsvqa_lr(max_samples, val_samples, seed)
+    # --- Data ---
+    train_ds, val_ds = _load_eurosat(max_samples, val_samples, seed)
 
-    # --- Record sample IDs for reproducibility ---
-    train_ids = [str(s.get("id", i)) for i, s in enumerate(train_ds)]
-    val_ids = [str(s.get("id", i)) for i, s in enumerate(val_ds)]
-    (CHECKPOINT_DIR / "train_ids.json").write_text(json.dumps(train_ids))
-    (CHECKPOINT_DIR / "val_ids.json").write_text(json.dumps(val_ids))
-    VOLUME.commit()
+    # Save split indices for reproducibility
+    (CKPT_DIR / "train_ids.json").write_text(json.dumps(list(range(len(train_ds)))))
+    (CKPT_DIR / "val_ids.json").write_text(json.dumps(list(range(len(val_ds)))))
 
-    # --- Load tokenizer ---
-    print(f"[M1] Loading tokenizer: {geochat_model}")
-    tokenizer = AutoTokenizer.from_pretrained(
-        geochat_model, trust_remote_code=True, cache_dir=str(MODEL_CACHE)
+    # --- Purge stale model cache from Volume (forces re-download with correct tokenizer) ---
+    # If the Volume cached tokenizer.json was from a tokenizers<0.20 session, it is
+    # invalid. Wipe only the tokenizer files; the model weights can stay.
+    import shutil
+    for stale in (MODEL_CACHE / "models--llava-hf--llava-1.5-7b-hf").glob("**/tokenizer*"):
+        if stale.is_file():
+            stale.unlink()
+            print(f"[M1] Purged stale: {stale.name}")
+
+    # --- Processor (tokeniser + image processor in one) ---
+    print(f"[M1] Loading processor  tokenizers={__import__('tokenizers').__version__}")
+    processor = AutoProcessor.from_pretrained(
+        MODEL_ID,
+        cache_dir=str(MODEL_CACHE),
+        use_fast=False,          # use Python tokenizer — avoids Rust serde issues entirely
     )
-    tokenizer.pad_token = tokenizer.eos_token
+    processor.tokenizer.padding_side = "right"
+    if processor.tokenizer.pad_token is None:
+        processor.tokenizer.pad_token = processor.tokenizer.eos_token
 
-    # --- Tokenise ---
-    def tokenise(batch):
-        prompts = [_format_sample(s)["prompt"] + " " + _format_sample(s)["answer"]
-                   for s in batch]
-        return tokenizer(prompts, truncation=True, max_length=512, padding="max_length")
+    # --- Tokenise: image + instruction + label ---
+    def preprocess(sample):
+        image  = sample["image"]                       # PIL Image from EuroSAT
+        label  = CLASSES[sample["label"]]
+        prompt = PROMPT_TEMPLATE + " " + label
 
-    train_tok = train_ds.map(lambda b: tokenise([b]), batched=False,
-                             remove_columns=train_ds.column_names)
-    val_tok = val_ds.map(lambda b: tokenise([b]), batched=False,
-                         remove_columns=val_ds.column_names)
-    train_tok = train_tok.with_format("torch")
-    val_tok = val_tok.with_format("torch")
+        enc = processor(
+            text=prompt,
+            images=image,
+            return_tensors="pt",
+            padding="max_length",
+            max_length=256,
+            truncation=True,
+        )
+        enc = {k: v.squeeze(0) for k, v in enc.items()}
+        enc["labels"] = enc["input_ids"].clone()
+        return enc
 
-    # --- Load model in 4-bit (QLoRA) ---
-    print(f"[M1] Loading model in 4-bit: {geochat_model}")
-    bnb_cfg = BitsAndBytesConfig(
+    keep = ["input_ids", "attention_mask", "pixel_values", "labels"]
+    train_tok = train_ds.map(preprocess, remove_columns=train_ds.column_names)
+    val_tok   = val_ds.map(preprocess,   remove_columns=val_ds.column_names)
+    train_tok.set_format("torch", columns=keep)
+    val_tok.set_format("torch", columns=keep)
+
+    # --- Custom collator (Trainer needs pixel_values handled) ---
+    def collate(batch):
+        return {
+            "input_ids":      torch.stack([b["input_ids"]      for b in batch]),
+            "attention_mask": torch.stack([b["attention_mask"] for b in batch]),
+            "pixel_values":   torch.stack([b["pixel_values"]   for b in batch]),
+            "labels":         torch.stack([b["labels"]         for b in batch]),
+        }
+
+    # --- Load model in 4-bit QLoRA ---
+    print(f"[M1] Loading {MODEL_ID} (4-bit QLoRA)...")
+    bnb = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_use_double_quant=True,
     )
-    model = AutoModelForCausalLM.from_pretrained(
-        geochat_model,
-        quantization_config=bnb_cfg,
+    model = LlavaForConditionalGeneration.from_pretrained(
+        MODEL_ID,
+        quantization_config=bnb,
         device_map="auto",
-        trust_remote_code=True,
         cache_dir=str(MODEL_CACHE),
     )
+    model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
 
-    # --- Freeze vision encoder if requested ---
+    # Freeze vision tower (mandatory on A10G — 23.7 GB)
     if freeze_vision:
         frozen = 0
         for name, param in model.named_parameters():
-            if any(k in name.lower() for k in ["vision", "visual", "clip", "patch_embed"]):
+            if "vision_tower" in name:
                 param.requires_grad = False
                 frozen += 1
-        print(f"[M1] Froze {frozen} vision encoder parameter groups.")
+        print(f"[M1] Vision tower frozen ({frozen} param groups).")
 
     # --- BEFORE evaluation ---
-    print("[M1] Running BEFORE evaluation on val set...")
-    before_metrics = _evaluate(model, tokenizer, val_ds)
-    print(f"[M1] BEFORE accuracy: {before_metrics['accuracy']:.4f}")
+    print("[M1] BEFORE evaluation...")
+    before = _evaluate(model, processor, val_ds)
+    print(f"[M1] BEFORE  acc={before['accuracy']:.4f}  ({before['correct']}/{before['total']})")
 
-    # --- Apply LoRA ---
+    # --- Apply LoRA to language model attention layers ---
     lora_cfg = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         r=lora_r,
         lora_alpha=lora_alpha,
-        target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj"],
         lora_dropout=0.05,
         bias="none",
     )
     model = get_peft_model(model, lora_cfg)
     model.print_trainable_parameters()
 
-    # --- Training ---
-    training_args = TrainingArguments(
-        output_dir=str(CHECKPOINT_DIR),
+    # --- Train ---
+    args = TrainingArguments(
+        output_dir=str(CKPT_DIR),
         num_train_epochs=epochs,
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
-        gradient_accumulation_steps=4,
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
+        gradient_accumulation_steps=8,
         learning_rate=2e-4,
+        warmup_ratio=0.03,
+        lr_scheduler_type="cosine",
         fp16=True,
-        logging_steps=50,
+        logging_steps=20,
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
         seed=seed,
-        report_to="none",
         dataloader_num_workers=2,
+        remove_unused_columns=False,     # keep pixel_values
+        report_to="none",
     )
-
     trainer = Trainer(
         model=model,
-        args=training_args,
+        args=args,
         train_dataset=train_tok,
         eval_dataset=val_tok,
-        tokenizer=tokenizer,
+        data_collator=collate,
+        tokenizer=processor.tokenizer,
     )
-
-    print("[M1] Starting training...")
+    print("[M1] Training...")
     trainer.train()
-    trainer.save_model(str(CHECKPOINT_DIR / "final"))
+    trainer.save_model(str(CKPT_DIR / "final"))
     VOLUME.commit()
 
     # --- AFTER evaluation ---
-    print("[M1] Running AFTER evaluation on val set...")
-    after_metrics = _evaluate(model, tokenizer, val_ds)
-    print(f"[M1] AFTER accuracy: {after_metrics['accuracy']:.4f}")
+    print("[M1] AFTER evaluation...")
+    after = _evaluate(model, processor, val_ds)
+    print(f"[M1] AFTER   acc={after['accuracy']:.4f}  ({after['correct']}/{after['total']})")
 
-    elapsed = time.time() - t_start
-
-    # --- Write results record ---
+    elapsed = round(time.time() - t0, 1)
     results = {
+        "base_model": MODEL_ID,
+        "note": "LLaVA-1.5-7B = GeoChat base architecture. Native transformers support.",
+        "dataset": "tanganke/eurosat (Sentinel-2, 10 RS classes, CC-BY-4.0)",
         "seed": seed,
-        "max_samples": max_samples,
-        "val_samples": val_samples,
+        "train_samples": len(train_ds),
+        "val_samples": len(val_ds),
         "lora_r": lora_r,
         "lora_alpha": lora_alpha,
+        "target_modules": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj"],
         "epochs": epochs,
         "freeze_vision": freeze_vision,
-        "base_model": geochat_model,
-        "dataset": "RSVQA-LR (SatML/RSVQA-LR)",
-        "gpu": torch.cuda.get_device_name(0),
-        "elapsed_seconds": round(elapsed, 1),
-        "before": before_metrics,
-        "after": after_metrics,
-        "delta_accuracy": round(after_metrics["accuracy"] - before_metrics["accuracy"], 4),
-        "checkpoint_dir": str(CHECKPOINT_DIR / "final"),
+        "gpu": gpu,
+        "vram_gb": round(vram, 1),
+        "elapsed_seconds": elapsed,
+        "before": before,
+        "after": after,
+        "delta_accuracy": round(after["accuracy"] - before["accuracy"], 4),
+        "checkpoint": str(CKPT_DIR / "final"),
     }
-
-    results_path = CHECKPOINT_DIR / "m1_results.json"
-    results_path.write_text(json.dumps(results, indent=2))
+    (CKPT_DIR / "m1_results.json").write_text(json.dumps(results, indent=2))
     VOLUME.commit()
 
     print("\n" + "=" * 60)
-    print("M1 TRAINING COMPLETE — copy these into reproduce_m1_run.md")
+    print("M1 DONE — paste this into training/reproduce_m1_run.md")
     print("=" * 60)
     print(json.dumps(results, indent=2))
     return results
 
 
 # ---------------------------------------------------------------------------
-# Evaluation helper
+# Evaluation — top-1 accuracy (generate, compare against ground truth)
 # ---------------------------------------------------------------------------
 
-def _evaluate(model, tokenizer, val_ds) -> dict:
-    """Simple accuracy on RSVQA-LR yes/no/number questions."""
+def _evaluate(model, processor, val_ds, n: int = 100) -> dict:
     import torch
-
     model.eval()
-    correct = 0
-    total = 0
+    correct, total = 0, 0
 
     with torch.no_grad():
-        for sample in list(val_ds)[:100]:  # cap at 100 for speed
-            formatted = _format_sample(sample)
-            inputs = tokenizer(
-                formatted["prompt"],
+        for sample in list(val_ds)[:n]:
+            gt = CLASSES[sample["label"]].lower()
+            enc = processor(
+                text=PROMPT_TEMPLATE,
+                images=sample["image"],
                 return_tensors="pt",
-                truncation=True,
-                max_length=256,
             ).to(model.device)
-            out = model.generate(**inputs, max_new_tokens=16, do_sample=False)
-            pred = tokenizer.decode(out[0], skip_special_tokens=True)
-            pred_ans = pred.split("Answer:")[-1].strip().lower()
-            gt_ans = str(formatted["answer"]).strip().lower()
-            if pred_ans.startswith(gt_ans) or gt_ans in pred_ans:
+            out = model.generate(**enc, max_new_tokens=10, do_sample=False)
+            pred = processor.tokenizer.decode(out[0], skip_special_tokens=True)
+            pred_ans = pred.split("ASSISTANT:")[-1].strip().lower()
+            if gt in pred_ans or pred_ans.startswith(gt[:6]):
                 correct += 1
             total += 1
 
-    acc = correct / total if total else 0.0
-    return {"accuracy": round(acc, 4), "correct": correct, "total": total}
+    return {"accuracy": round(correct / total, 4), "correct": correct, "total": total}
 
 
 # ---------------------------------------------------------------------------
-# Local entrypoint — for testing without Modal
+# Local entrypoint
 # ---------------------------------------------------------------------------
 
 @app.local_entrypoint()
 def main(
-    seed: int = 42,
+    seed: int        = 42,
     max_samples: int = 3000,
     val_samples: int = 300,
-    lora_r: int = 16,
-    lora_alpha: int = 32,
-    epochs: int = 3,
+    lora_r: int      = 16,
+    lora_alpha: int  = 32,
+    epochs: int      = 3,
 ):
     result = run.remote(
-        seed=seed,
-        max_samples=max_samples,
-        val_samples=val_samples,
-        lora_r=lora_r,
-        lora_alpha=lora_alpha,
-        epochs=epochs,
+        seed=seed, max_samples=max_samples, val_samples=val_samples,
+        lora_r=lora_r, lora_alpha=lora_alpha, epochs=epochs,
     )
-    print("\n[DONE] Results:")
-    print(json.dumps(result, indent=2))
-    print("\n→ Now fill in training/reproduce_m1_run.md with these values.")
+    print("\n[DONE]", json.dumps(result, indent=2))
+    print("\n→ Paste results into training/reproduce_m1_run.md")
