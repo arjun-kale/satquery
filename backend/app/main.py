@@ -7,9 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import health
+from app.api.ingest import router as ingest_router
+from app.api.jobs import router as jobs_router
 from app.schemas import HealthResponse
 from app.config import Settings
 from app.storage.jobs import JobRepository
+from app.storage.artifacts import ArtifactRepository
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,15 +23,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         active_settings.data_dir.mkdir(parents=True, exist_ok=True)
+
         repository = JobRepository(active_settings.database_path)
         repository.initialize()
+
+        artifact_repo = ArtifactRepository(active_settings.data_dir)
+        artifact_repo.initialize()
+
         app.state.settings = active_settings
         app.state.job_repository = repository
+        app.state.artifact_repository = artifact_repo
         yield
 
     app = FastAPI(
         title="SatQuery API",
-        version="0.1.0",
+        version="0.2.0",
         description="Local geospatial-analysis MVP API.",
         lifespan=lifespan,
     )
@@ -46,6 +55,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response_model=HealthResponse,
         tags=["health"],
     )
+    app.include_router(ingest_router)
+    app.include_router(jobs_router)
     return app
 
 

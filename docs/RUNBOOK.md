@@ -1,27 +1,54 @@
-# SatQuery MVP Runbook
+# SatQuery AI — Demo Runbook
 
-## Phase 0 local demo mode
+## Judging / local demo (default)
 
-Use this mode for judging when the UI and backend run on the same laptop. It is
-the default and does not require a tunnel.
+Run everything on the team laptop. No internet required.
 
-1. Start FastAPI on port 8000.
-2. Start Next.js on port 3000 with `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
-3. Confirm the UI status reads `BACKEND ONLINE / MOCK`.
+```bash
+# Terminal 1 — backend
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
 
-## Remote public-sample mode
+# Terminal 2 — frontend
+cd frontend
+npm run dev
+```
 
-Only use public sample imagery. Start the backend locally and expose port 8000
-through a short-lived Cloudflare Tunnel. Set the deployed Vercel project's
-`NEXT_PUBLIC_API_BASE_URL` to that HTTPS tunnel URL and add the Vercel origin to
-`SATQUERY_CORS_ORIGINS`.
+Open `http://localhost:3000`. Backend health indicator should show **BACKEND ONLINE / MOCK**.
 
-Do not use a Vercel deployment, tunnel, or Modal with restricted imagery or
-sensitive coordinates. The final system cannot claim sovereign hosting in this
-mode.
+Verify backend directly:
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","database":"ok","model_mode":"mock"}
+```
 
-## Diagnosing a failed request
+---
 
-Future API errors include a `request_id`. Search backend logs by that ID, then
-inspect the job's state transition and tool-step trace. Phase 0 only exposes
-`/health`; ingestion and execution arrive in later phases.
+## Remote public-sample demo (Vercel + Cloudflare Tunnel)
+
+> ⚠️ Use **public imagery only**. Never send restricted coordinates or sensitive data through the tunnel.
+
+```bash
+# 1. Start backend locally
+cd backend && uvicorn app.main:app --port 8000
+
+# 2. Open a Cloudflare Tunnel
+cloudflared tunnel --url http://localhost:8000
+# Note the generated *.trycloudflare.com URL
+
+# 3. Set NEXT_PUBLIC_API_BASE_URL in Vercel dashboard to the tunnel URL
+# 4. Redeploy or trigger a Vercel rebuild
+```
+
+---
+
+## Environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `SATQUERY_MODEL_MODE` | backend `.env` | `mock` / `local` / `modal` |
+| `SATQUERY_CORS_ORIGINS` | backend `.env` | Allowed frontend origins |
+| `NEXT_PUBLIC_API_BASE_URL` | frontend `.env.local` | Backend base URL |
+
+No model tokens or secrets belong in `NEXT_PUBLIC_*` variables.
