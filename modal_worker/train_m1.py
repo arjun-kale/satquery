@@ -96,7 +96,7 @@ def _load_eurosat(max_train: int, max_val: int, seed: int):
 
 @app.function(
     gpu="A10G",
-    timeout=7200,
+    timeout=28800,  # 8 hours — 3-epoch LLaVA QLoRA takes ~4h on A10G
     volumes={str(VOL_PATH): VOLUME},
     secrets=[modal.Secret.from_name("huggingface-secret")],
 )
@@ -254,6 +254,14 @@ def run(
         remove_unused_columns=False,     # keep pixel_values
         report_to="none",
     )
+    from transformers import TrainerCallback
+
+    class VolumeCommitCallback(TrainerCallback):
+        """Commit the Modal Volume after every epoch so checkpoints survive cancellation."""
+        def on_save(self, args, state, control, **kwargs):
+            print(f"[M1] Committing Volume at step {state.global_step}...")
+            VOLUME.commit()
+
     trainer = Trainer(
         model=model,
         args=args,
@@ -261,9 +269,10 @@ def run(
         eval_dataset=val_tok,
         data_collator=collate,
         tokenizer=processor.tokenizer,
+        callbacks=[VolumeCommitCallback()],
     )
     print("[M1] Training...")
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
     trainer.save_model(str(CKPT_DIR / "final"))
     VOLUME.commit()
 
@@ -343,9 +352,11 @@ def main(
     lora_alpha: int  = 32,
     epochs: int      = 3,
 ):
-    result = run.remote(
+    print("\n[M1] Launching training in DETACHED mode. Your laptop connection will not affect the run.")
+    call = run.spawn(
         seed=seed, max_samples=max_samples, val_samples=val_samples,
         lora_r=lora_r, lora_alpha=lora_alpha, epochs=epochs,
     )
-    print("\n[DONE]", json.dumps(result, indent=2))
-    print("\n→ Paste results into training/reproduce_m1_run.md")
+    print(f"\n[DONE] Job launched! You can safely close your terminal.")
+    print(f"View progress at: https://modal.com/logs/call/{call.object_id}")
+    print("\n→ When it finishes, check the logs and paste results into training/reproduce_m1_run.md")
