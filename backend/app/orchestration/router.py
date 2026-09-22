@@ -10,6 +10,7 @@ class QueryType(str, Enum):
     OBJECT_GROUNDING = "OBJECT_GROUNDING"
     CHANGE_DETECTION = "CHANGE_DETECTION"
     SAR_WATER = "SAR_WATER"
+    CROSS_MODAL = "CROSS_MODAL"
 
 # Fixed version for reproducibility
 ROUTER_VERSION = "v1.0.0"
@@ -41,6 +42,11 @@ CANONICAL_TEMPLATES = {
         "find water in this SAR image",
         "calibrate and despeckle this radar image to find water",
     ],
+    QueryType.CROSS_MODAL: [
+        "use optical and SAR together",
+        "identify built-up regions from radar and optical",
+        "combine optical and synthetic aperture radar",
+    ],
 }
 
 # Fixed DAG maps for each query type
@@ -48,8 +54,9 @@ QUERY_DAGS = {
     QueryType.SPECTRAL_WATER_VEGETATION: ["preview", "spectral_index", "geochat_vqa", "geodesy"],
     QueryType.CAPTION_SCENE: ["preview", "geochat_caption"],
     QueryType.OBJECT_GROUNDING: ["preview", "geochat_grounding", "geodesy"],
-    QueryType.CHANGE_DETECTION: ["compatibility", "preview", "changeformer", "change_area"],
+    QueryType.CHANGE_DETECTION: ["compatibility", "preview", "changeformer", "change_area", "change_vqa"],
     QueryType.SAR_WATER: ["sar_calibrate", "sar_despeckle", "mndwi", "geochat_summary"],
+    QueryType.CROSS_MODAL: ["compatibility", "preview", "sar_calibrate", "sar_despeckle", "mndwi", "cross_modal_fusion", "geochat_vqa"],
 }
 
 class RoutingResult(BaseModel):
@@ -78,16 +85,16 @@ class QueryRouter:
         flat_templates = [t for templates in CANONICAL_TEMPLATES.values() for t in templates]
         self.template_embeddings = self.model.encode(flat_templates, convert_to_numpy=True)
         
-    def route(self, query: str) -> RoutingResult:
+    def route(self, query: str, image_ids: List[str] = None) -> RoutingResult:
         query_emb = self.model.encode([query], convert_to_numpy=True)[0]
         
         # Cosine similarity
         norm_q = np.linalg.norm(query_emb)
         norm_t = np.linalg.norm(self.template_embeddings, axis=1)
         
-        # Prevent division by zero
         if norm_q == 0 or np.any(norm_t == 0):
-            return RoutingResult(query_type=None, dag=[], score=0.0, is_supported=False)
+            best_type = QueryType.CHANGE_DETECTION if (image_ids and len(image_ids) == 2) else None
+            return RoutingResult(query_type=best_type, dag=QUERY_DAGS[best_type] if best_type else [], score=0.0, is_supported=bool(best_type))
             
         similarities = np.dot(self.template_embeddings, query_emb) / (norm_t * norm_q)
         
@@ -96,8 +103,13 @@ class QueryRouter:
         best_score = float(similarities[best_idx])
         best_type = self.template_types[best_idx]
         
+        # Override for 2 images if not explicitly asking for cross modal
+        if image_ids and len(image_ids) == 2 and best_type != QueryType.CROSS_MODAL:
+            best_type = QueryType.CHANGE_DETECTION
+            best_score = 1.0
+            
         # Check threshold
-        if best_score < SIMILARITY_THRESHOLD:
+        if best_score < SIMILARITY_THRESHOLD and best_type != QueryType.CHANGE_DETECTION:
             return RoutingResult(query_type=None, dag=[], score=best_score, is_supported=False)
             
         # Check tie margin (ambiguity)

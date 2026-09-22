@@ -1,5 +1,5 @@
 import pytest
-from backend.app.orchestration.router import QueryRouter, QueryType, RoutingResult
+from app.orchestration.router import QueryRouter, QueryType, RoutingResult
 
 @pytest.fixture(scope="module")
 def router():
