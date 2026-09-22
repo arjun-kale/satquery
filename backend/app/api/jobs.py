@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.schemas import JobRecord
 from app.state import JobStatus
+from app.orchestration.router import QueryRouter
+from app.orchestration.executor import DAGExecutor
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
+# Initialize singleton router (loads the lightweight sentence-transformer model in memory)
+query_router = QueryRouter()
 
 class CreateJobRequest(BaseModel):
     image_ids: list[str]
@@ -18,12 +22,17 @@ class CreateJobRequest(BaseModel):
 
 
 @router.post("/jobs", response_model=JobRecord, status_code=201)
-def create_job(body: CreateJobRequest, request: Request) -> JobRecord:
+def create_job(body: CreateJobRequest, request: Request, background_tasks: BackgroundTasks) -> JobRecord:
     """Create an analysis job from image id(s) and a natural-language query."""
     repo = request.app.state.job_repository
     job = repo.create()
-    # Stub: immediately transition to VALIDATED (orchestration in Phase 3)
-    job = repo.transition(job.id, JobStatus.VALIDATED)
+    
+    # Execute the DAG asynchronously in the background so we don't block the API.
+    # The executor itself will handle the state transitions (RECEIVED -> VALIDATED -> ROUTING).
+    artifact_repo = request.app.state.artifact_repository
+    executor = DAGExecutor(query_router, repo, artifact_repo)
+    background_tasks.add_task(executor.execute, job.id, body.query, {"image_ids": body.image_ids})
+    
     return job
 
 
@@ -39,17 +48,26 @@ def get_job(job_id: str, request: Request) -> JobRecord:
 
 @router.get("/jobs/{job_id}/trace")
 def get_trace(job_id: str, request: Request) -> dict:
-    """Fetch the immutable execution trace (stub — full impl in Phase 3)."""
+    """Fetch the immutable execution trace."""
     repo = request.app.state.job_repository
+    artifact_repo = request.app.state.artifact_repository
+    
     try:
         job = repo.get(job_id)
     except KeyError:
         raise HTTPException(404, detail=f"Job {job_id!r} not found.")
+        
+    trace_data = None
+    if artifact_repo.artifact_exists(job_id, "trace.json"):
+        import json
+        trace_path = artifact_repo.artifact_path(job_id, "trace.json")
+        trace_data = json.loads(trace_path.read_text()).get("trace")
+        
     return {
         "job_id": job.id,
         "status": job.status,
-        "trace_steps": [],
-        "note": "Full ObservableExecutionTrace implemented in Phase 3.",
+        "trace": trace_data,
+        "failure_reason": job.failure_reason,
     }
 
 
@@ -61,3 +79,5 @@ def get_artifact(job_id: str, name: str, request: Request) -> FileResponse:
         raise HTTPException(404, detail=f"Artifact {name!r} not found for job {job_id!r}.")
     path = artifact_repo.artifact_path(job_id, name)
     return FileResponse(path)
+
+

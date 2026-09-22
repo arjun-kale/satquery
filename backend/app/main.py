@@ -41,12 +41,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Local geospatial-analysis MVP API.",
         lifespan=lifespan,
     )
+    # Enable CORS for Next.js frontend (local and production)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=active_settings.allowed_origins,
-        allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "X-Request-ID"],
+        allow_origins=["http://localhost:3000", "https://satquery.vercel.app"] + active_settings.allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     app.add_api_route(
         "/health",
@@ -55,8 +56,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response_model=HealthResponse,
         tags=["health"],
     )
+    from app.api.report import router as report_router
     app.include_router(ingest_router)
     app.include_router(jobs_router)
+    app.include_router(report_router)
     return app
 
 
