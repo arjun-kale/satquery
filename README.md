@@ -58,12 +58,22 @@ npm run lint && npm run build
 | Phase | Status | Scope |
 |---|---|---|
 | 0 — Scaffold | ✅ Complete | FastAPI `/health`, SQLite job state machine, Next.js landing page |
-| 1 — Ingestion & EO tools | 🔧 In progress | GeoTIFF ingest, NDVI/MNDWI/NDBI, geodesy, SAR calibration, guardrail |
-| 2 — RS model adapters | ⏳ Pending | GeoChat, ChangeFormer, MockAdapter, M1 LoRA adaptation gate |
-| 3 — Router & executor | ⏳ Pending | Embedding-template router, typed DAG executor, trace |
-| 4 — Evidence UI | ⏳ Pending | Upload, metadata, query, viewer, trace panel, DAG timeline |
-| 5 — Modal inference | ⏳ Pending | Optional GPU inference via Modal |
-| 6 — Evaluation & handoff | ⏳ Pending | Benchmarks, KNOWN_LIMITATIONS, final docs |
+| 1 — Ingestion & EO tools | ✅ Complete | GeoTIFF ingest, NDVI/MNDWI/NDBI, geodesy, SAR calibration, guardrail |
+| 2 — RS model adapters | ✅ Complete | GeoChat, ChangeFormer, MockAdapter, M1 LoRA adaptation gate |
+| 3 — Router & executor | ✅ Complete | Embedding-template router, typed DAG executor, trace |
+| 4 — Evidence UI | ✅ Complete | Upload, metadata, query, viewer, trace panel, DAG timeline |
+| 5 — Modal inference | ✅ Complete | GPU inference via Modal, Bi-Temporal UI, Change VQA |
+| 6 — Evaluation & handoff | ✅ Complete | SAR Fusion, Benchmarks, Execution Reports |
+
+---
+
+## Model Training & Benchmarks
+
+The LLaVA-1.5-7B base model was successfully fine-tuned on the EuroSAT dataset utilizing QLoRA, resulting in an adapted Vision-Language Model tailored for remote sensing.
+
+![Accuracy Comparison](docs/images/accuracy_comparison.png)
+
+![Training Loss Curve](docs/images/training_loss.png)
 
 ---
 
