@@ -21,7 +21,7 @@ def download_report(job_id: str, request: Request):
         trace_data = json.loads(trace_path.read_text()).get("trace")
         
     artifacts = []
-    for artifact_file in ["preview.png", "preview_b.png", "index_mask.png", "change_mask.png", "fused_preview.png", "grounding_boxes.json"]:
+    for artifact_file in ["preview.png", "preview_b.png", "index_mask.png", "change_mask.png", "fused_preview.png", "grounding_boxes.json", "change_regions.json"]:
         if artifact_repo.artifact_exists(job_id, artifact_file):
             artifacts.append(f"/api/jobs/{job_id}/artifacts/{artifact_file}")
             

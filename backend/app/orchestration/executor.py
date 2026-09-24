@@ -6,9 +6,11 @@ import json
 import time
 from typing import Any
 
-from app.orchestration.router import QueryRouter, ROUTER_VERSION, SIMILARITY_THRESHOLD
+from app.orchestration.cancel import clear as cancel_clear, is_cancel_requested
+from app.orchestration.router import QueryRouter, QueryType, ROUTER_VERSION, SIMILARITY_THRESHOLD
 from app.orchestration.schema import (
     ExecutionStep,
+    RouteCandidate,
     ObservableExecutionTrace,
     OrchestratorTrace,
     StepStatus,
@@ -16,6 +18,8 @@ from app.orchestration.schema import (
 from app.state import JobStatus
 from app.storage.artifacts import ArtifactRepository
 from app.storage.jobs import JobRepository
+
+CANCELLED_REASON = "CANCELLED: stopped by the user"
 
 
 class DAGExecutor:
@@ -56,6 +60,8 @@ class DAGExecutor:
         job_id: str,
         query: str,
         initial_inputs: dict[str, Any],
+        scene_set_kind: str | None = None,
+        forced_task: str | None = None,
     ) -> ObservableExecutionTrace:
         """Run the full DAG for *job_id* and return the final trace."""
         from app.orchestration.dispatcher import dispatch_tool
@@ -72,7 +78,12 @@ class DAGExecutor:
         initial_inputs = {**initial_inputs, "query": query}
 
         # --- Route ---
-        route_result = self.router.route(query, image_ids=initial_inputs.get("image_ids"))
+        route_result = self.router.route(
+            query,
+            image_ids=initial_inputs.get("image_ids"),
+            scene_set_kind=scene_set_kind,
+            forced_type=QueryType(forced_task) if forced_task else None,
+        )
 
         trace = OrchestratorTrace(
             query=query,
@@ -82,13 +93,25 @@ class DAGExecutor:
             ),
             similarity_score=route_result.score,
             similarity_threshold=SIMILARITY_THRESHOLD,
+            routing_mode=route_result.mode,
+            runner_up=(
+                RouteCandidate(task=route_result.runner_up.task.value, score=route_result.runner_up.score)
+                if route_result.runner_up else None
+            ),
+            candidates=[RouteCandidate(task=c.task.value, score=c.score) for c in route_result.candidates],
+            rejection=route_result.rejection,
+            scene_set_kind=scene_set_kind,
+            image_ids=list(initial_inputs.get("image_ids") or []),
+            model_mode=self.model_mode,
+            planned_steps=list(route_result.dag),
         )
         trace_obj = ObservableExecutionTrace(job_id=job_id, trace=trace)
         self._save_trace(job_id, trace_obj)
 
         if not route_result.is_supported:
             self.job_repo.transition(
-                job_id, JobStatus.REJECTED, failure_reason="Unsupported query"
+                job_id, JobStatus.REJECTED,
+                failure_reason=f"Unsupported query ({route_result.rejection or 'no route'})",
             )
             trace.total_latency_ms = (time.time() - start_time) * 1000
             self._save_trace(job_id, trace_obj)
@@ -99,6 +122,14 @@ class DAGExecutor:
         current_inputs = initial_inputs.copy()
 
         for tool_name in route_result.dag:
+            if is_cancel_requested(job_id):
+                cancel_clear(job_id)
+                trace.cancelled = True
+                self.job_repo.transition(job_id, JobStatus.FAILED, failure_reason=CANCELLED_REASON)
+                trace.total_latency_ms = (time.time() - start_time) * 1000
+                self._save_trace(job_id, trace_obj)
+                return trace_obj
+
             step = ExecutionStep(
                 tool_name=tool_name,
                 status=StepStatus.RUNNING,
@@ -139,6 +170,7 @@ class DAGExecutor:
             step.latency_ms = (time.time() - step_start) * 1000
             self._save_trace(job_id, trace_obj)
 
+        cancel_clear(job_id)
         self.job_repo.transition(job_id, JobStatus.COMPLETED)
         trace.total_latency_ms = (time.time() - start_time) * 1000
         self._save_trace(job_id, trace_obj)

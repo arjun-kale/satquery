@@ -8,7 +8,10 @@ from pydantic import BaseModel
 
 from app.schemas import JobRecord
 from app.state import JobStatus
-from app.orchestration.router import QueryRouter
+from typing import Literal
+
+from app.orchestration.cancel import request_cancel
+from app.orchestration.router import QueryRouter, QueryType
 from app.orchestration.executor import DAGExecutor
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -19,6 +22,9 @@ query_router = QueryRouter()
 class CreateJobRequest(BaseModel):
     image_ids: list[str]
     query: str
+    scene_set_kind: Literal["single", "bitemporal", "optical_sar"] | None = None
+    # Set only when the user picked an intent after the router said it was unsure.
+    task: QueryType | None = None
 
 
 @router.post("/jobs", response_model=JobRecord, status_code=201)
@@ -26,13 +32,35 @@ def create_job(body: CreateJobRequest, request: Request, background_tasks: Backg
     """Create an analysis job from image id(s) and a natural-language query."""
     repo = request.app.state.job_repository
     job = repo.create()
-    
+
     # Execute the DAG asynchronously in the background so we don't block the API.
     # The executor itself will handle the state transitions (RECEIVED -> VALIDATED -> ROUTING).
     artifact_repo = request.app.state.artifact_repository
-    executor = DAGExecutor(query_router, repo, artifact_repo)
-    background_tasks.add_task(executor.execute, job.id, body.query, {"image_ids": body.image_ids})
-    
+    executor = DAGExecutor(
+        query_router, repo, artifact_repo, model_mode=request.app.state.settings.model_mode
+    )
+    background_tasks.add_task(
+        executor.execute,
+        job.id,
+        body.query,
+        {"image_ids": body.image_ids},
+        scene_set_kind=body.scene_set_kind,
+        forced_task=body.task.value if body.task else None,
+    )
+
+    return job
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=JobRecord)
+def cancel_job(job_id: str, request: Request) -> JobRecord:
+    """Ask a running job to stop. It stops before its next step; a running step finishes first."""
+    repo = request.app.state.job_repository
+    try:
+        job = repo.get(job_id)
+    except KeyError:
+        raise HTTPException(404, detail=f"Job {job_id!r} not found.")
+    if job.status not in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.REJECTED):
+        request_cancel(job_id)
     return job
 
 
@@ -58,12 +86,16 @@ def get_trace(job_id: str, request: Request) -> dict:
         raise HTTPException(404, detail=f"Job {job_id!r} not found.")
         
     trace_data = None
+    schema_version = None
     if artifact_repo.artifact_exists(job_id, "trace.json"):
         import json
         trace_path = artifact_repo.artifact_path(job_id, "trace.json")
-        trace_data = json.loads(trace_path.read_text()).get("trace")
-        
+        saved = json.loads(trace_path.read_text())
+        trace_data = saved.get("trace")
+        schema_version = saved.get("schema_version")
+
     return {
+        "schema_version": schema_version,
         "job_id": job.id,
         "status": job.status,
         "trace": trace_data,
