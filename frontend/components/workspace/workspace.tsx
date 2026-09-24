@@ -46,7 +46,7 @@ function Shell() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <a href={`#${PROMPT_ID}`} className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-accent focus:px-3 focus:py-1.5 focus:text-white">
+      <a href={`#${PROMPT_ID}`} className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-action focus:px-3 focus:py-1.5 focus:text-white">
         Skip to the question box
       </a>
       <TopBar report={report} />
