@@ -3,12 +3,15 @@
 GeoChat accepts ONLY 3-channel rendered preview PNG files.
 Raw raster arrays, raw band data, and multi-band TIFFs must never reach this adapter.
 The band mapping used to produce the preview is recorded in every call.
+
+Modal mode calls the ``GeoChatInfer`` class deployed from ``modal_worker/infer.py``
+(GeoChat-7B + the M2 BigEarthNet.txt LoRA). Confidence values come from the model's own
+token probabilities (see infer.py), hence ``confidence_source="model-provided"``.
 """
 
 from __future__ import annotations
 
 from typing import Literal
-import modal
 
 from app.models.base import (
     BaseModelAdapter,
@@ -21,6 +24,9 @@ from app.models.base import (
 )
 
 _MAX_PREVIEW_BYTES = 10 * 1024 * 1024   # 10 MB
+MODAL_APP = "satquery-m1-infer"
+MODAL_CLASS = "GeoChatInfer"
+
 
 def _validate_preview(preview_png: bytes, band_map: str) -> None:
     assert_preview_input(preview_png)
@@ -35,57 +41,62 @@ def _validate_preview(preview_png: bytes, band_map: str) -> None:
 class GeoChatAdapter(BaseModelAdapter):
     def __init__(self, mode: Literal["local", "modal"] = "local") -> None:
         self._mode = mode
-        self._model = None
+        self._cls = None
         if self._mode == "modal":
-            try:
-                self.infer_cls = modal.Cls.lookup("satquery-m1-infer", "GeoChatInfer")
-            except Exception as e:
-                print(f"Warning: Could not lookup satquery-m1-infer: {e}")
+            import modal
+
+            # Lazy reference: resolved on the first remote call, so constructing the adapter
+            # never needs network access or a deployed app.
+            self._cls = modal.Cls.from_name(MODAL_APP, MODAL_CLASS)
 
     @property
     def model_mode(self) -> Literal["local", "modal"]:
         return self._mode
 
+    def _remote(self, method: str, *args, **kwargs) -> dict:
+        if self._mode != "modal":
+            raise ModelUnavailableError(
+                "GeoChat local mode is not available (no local GPU runtime); set MODEL_MODE=modal."
+            )
+        try:
+            return getattr(self._cls(), method).remote(*args, **kwargs)
+        except Exception as e:  # not deployed, no credentials, container failure, ...
+            raise ModelUnavailableError(f"GeoChat Modal worker unavailable ({MODAL_APP}.{MODAL_CLASS}.{method}): {e}") from e
+
     def caption(self, preview_png: bytes, *, band_map: str) -> ModelResult:
         _validate_preview(preview_png, band_map)
-        if self._mode == "modal":
-            res = self.infer_cls().caption.remote(preview_png, band_map=band_map)
-            return ModelResult(
-                text=res.get("text", ""),
-                confidence=res.get("confidence", 0.0),
-                confidence_source="model-provided",
-                model_mode="modal"
-            )
-        raise ModelUnavailableError("local mode not implemented")
+        res = self._remote("caption", preview_png, band_map=band_map)
+        return ModelResult(
+            text=res.get("text", ""),
+            confidence=float(res.get("confidence", 0.0)),
+            confidence_source="model-provided",
+            model_mode="modal",
+        )
 
     def answer(self, preview_png: bytes, query: str, *, band_map: str) -> ModelResult:
         _validate_preview(preview_png, band_map)
-        if self._mode == "modal":
-            res = self.infer_cls().answer.remote(preview_png, query, band_map=band_map)
-            return ModelResult(
-                text=res.get("text", ""),
-                confidence=res.get("confidence", 0.0),
-                confidence_source="model-provided",
-                model_mode="modal"
-            )
-        raise ModelUnavailableError("local mode not implemented")
+        res = self._remote("answer", preview_png, query, band_map=band_map)
+        return ModelResult(
+            text=res.get("text", ""),
+            confidence=float(res.get("confidence", 0.0)),
+            confidence_source="model-provided",
+            model_mode="modal",
+        )
 
     def ground(self, preview_png: bytes, query: str, *, band_map: str) -> list[GroundingBox]:
         _validate_preview(preview_png, band_map)
-        if self._mode == "modal":
-            res = self.infer_cls().ground.remote(preview_png, query, band_map=band_map)
-            boxes = []
-            for box in res.get("boxes", []):
-                boxes.append(GroundingBox(
-                    label=box["label"],
-                    confidence=box["confidence"],
-                    x_min=box["x_min"],
-                    y_min=box["y_min"],
-                    x_max=box["x_max"],
-                    y_max=box["y_max"],
-                ))
-            return boxes
-        raise ModelUnavailableError("local mode not implemented")
+        res = self._remote("ground", preview_png, query, band_map=band_map)
+        return [
+            GroundingBox(
+                label=box["label"],
+                confidence=float(box["confidence"]),
+                x_min=box["x_min"],
+                y_min=box["y_min"],
+                x_max=box["x_max"],
+                y_max=box["y_max"],
+            )
+            for box in res.get("boxes", [])
+        ]
 
     def detect_change(
         self,

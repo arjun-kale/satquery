@@ -41,3 +41,16 @@ def test_changeformer_modal_raises_model_unavailable():
     adapter = ChangeFormerAdapter(mode="modal")
     with pytest.raises(ModelUnavailableError):
         adapter.detect_change(FAKE_PNG, FAKE_PNG, band_map=BAND_MAP)
+
+
+def test_geochat_modal_worker_failure_raises_model_unavailable():
+    """An undeployed/unreachable Modal worker must surface as ModelUnavailableError, not a crash."""
+    adapter = GeoChatAdapter(mode="modal")
+
+    class Unreachable:
+        def __call__(self):
+            raise RuntimeError("App 'satquery-m1-infer' not found")
+
+    adapter._cls = Unreachable()
+    with pytest.raises(ModelUnavailableError, match="GeoChat Modal worker unavailable"):
+        adapter.ground(FAKE_PNG, "pastures", band_map=BAND_MAP)
