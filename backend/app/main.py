@@ -57,7 +57,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tags=["health"],
     )
     from app.api.report import router as report_router
+    from app.api.scene_sets import router as scene_sets_router
+    from app.api.samples import router as samples_router
     app.include_router(ingest_router)
+    app.include_router(scene_sets_router)
+    app.include_router(samples_router)
     app.include_router(jobs_router)
     app.include_router(report_router)
     return app
