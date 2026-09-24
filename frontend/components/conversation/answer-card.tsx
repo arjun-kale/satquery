@@ -51,18 +51,37 @@ function AnswerCard({ analysis, set, isActive, onAsk, onReport, reportState }: P
         </p>
       )}
 
-      {answer.text ? (
-        <ModelText text={answer.text} fromModel={!!answer.tool && answer.tool !== "cross_modal_fusion"} />
-      ) : !answer.tool && answer.measured.length ? (
-        <p className="text-lg text-fg">
-          <span className="text-fg-muted">{answer.measured[0].label}:</span>{" "}
-          <span className="font-mono tabular">{answer.measured[0].value}</span>
-          <span className="ml-2 align-middle text-xs text-fg-faint">measured from pixels, no model text for this question</span>
-        </p>
-      ) : (
-        <p className="text-lg text-fg-muted">Unable to determine an answer from these images.</p>
+      {answer.lead && (
+        <div className="flex flex-col gap-1">
+          <p className="text-lg leading-relaxed text-fg">{answer.lead}</p>
+          <span className="text-xs text-fg-faint">Measured from pixels — every number above comes from the rasters, not from a model.</span>
+        </div>
       )}
-      {answer.note && <p className="-mt-1 text-xs text-fg-faint">{answer.text ? `Model input: ${answer.note}` : answer.note}</p>}
+      {answer.lead ? (
+        answer.text && (
+          <div className="flex flex-col gap-1.5 rounded-sm border border-line bg-base/50 px-3 py-2">
+            <span className="text-xs font-medium tracking-wide text-fg-faint uppercase">
+              Model description{answer.note ? ` · ${answer.note}` : ""}
+            </span>
+            <ModelText text={answer.text} fromModel size="base" />
+          </div>
+        )
+      ) : (
+        <>
+          {answer.text ? (
+            <ModelText text={answer.text} fromModel={!!answer.tool && answer.tool !== "cross_modal_fusion"} />
+          ) : !answer.tool && answer.measured.length ? (
+            <p className="text-lg text-fg">
+              <span className="text-fg-muted">{answer.measured[0].label}:</span>{" "}
+              <span className="font-mono tabular">{answer.measured[0].value}</span>
+              <span className="ml-2 align-middle text-xs text-fg-faint">measured from pixels, no model text for this question</span>
+            </p>
+          ) : (
+            <p className="text-lg text-fg-muted">Unable to determine an answer from these images.</p>
+          )}
+          {answer.note && <p className="-mt-1 text-xs text-fg-faint">{answer.text ? `Model input: ${answer.note}` : answer.note}</p>}
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <ConfidenceLine answer={answer} />
@@ -127,12 +146,12 @@ function AnswerCard({ analysis, set, isActive, onAsk, onReport, reportState }: P
 }
 
 /** Model prose, with any quantities it states marked as the model's wording rather than measurements. */
-function ModelText({ text, fromModel }: { text: string; fromModel: boolean }) {
+function ModelText({ text, fromModel, size = "lg" }: { text: string; fromModel: boolean; size?: "lg" | "base" }) {
   const segments = fromModel ? splitModelQuantities(text) : [{ text, quantity: false }];
   const stated = segments.some((s) => s.quantity);
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-lg leading-relaxed text-fg">
+      <p className={cn("leading-relaxed text-fg", size === "lg" ? "text-lg" : "text-base")}>
         {segments.map((s, i) =>
           s.quantity ? (
             <Tip key={i} content="Stated by the model, not measured. Measured values are under “Measured from pixels”.">
@@ -157,10 +176,13 @@ function ModelText({ text, fromModel }: { text: string; fromModel: boolean }) {
 
 function ConfidenceLine({ answer }: { answer: ReturnType<typeof deriveAnswer> }) {
   const c = answer.confidence;
-  if (!c.available) return <span className="text-fg-faint">{c.reason}</span>;
+  // With a measured lead, the only model output rated here is the secondary description.
+  const of = answer.lead && answer.text ? "Model description: " : "";
+  if (!c.available) return <span className="text-fg-faint">{of}{c.reason}</span>;
   return (
     <Tip content={`${c.value.toFixed(2)} — ${CONFIDENCE_METHOD} It reflects how sure the model was of its wording, not whether the answer is true.`}>
       <span tabIndex={0} className="flex items-center gap-2 rounded-sm text-fg">
+        {of && <span className="text-fg-muted">{of}</span>}
         <span className="font-medium">{c.band.word}</span>
         <ConfidenceMeter steps={c.band.steps} />
       </span>

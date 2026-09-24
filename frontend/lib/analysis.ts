@@ -171,6 +171,8 @@ export interface Measurement {
 }
 
 export interface AnswerView {
+  /** A sentence assembled only from measured outputs (no model wording), when the run measured the answer. */
+  lead: string | null;
   text: string | null;
   tool: string | null;
   isMock: boolean;
@@ -186,6 +188,31 @@ const ANSWER_TOOLS: { tool: string; key: string }[] = [
 ];
 
 export function deriveAnswer(trace: OrchestratorTrace | null): AnswerView {
+  return { ...deriveAnswerText(trace), lead: measuredLead(trace) };
+}
+
+/** Change questions are answered by measurements first; the VLM only ever sees T1. */
+function measuredLead(trace: OrchestratorTrace | null): string | null {
+  const ic = stepOf(trace, "index_change");
+  if (!ic) return null;
+  const o = ic.step.outputs;
+  const t1 = formatArea(num(o.water_area_t1_m2));
+  const t2 = formatArea(num(o.water_area_t2_m2));
+  const gained = formatArea(num(o.gained_area_m2));
+  const lost = formatArea(num(o.lost_area_m2));
+  if (!t1 || !t2) return null;
+  const parts = [`Water covered ${t1} at T1 and ${t2} at T2`];
+  if (gained || lost) parts.push(`about ${gained ?? "0 m²"} became water and ${lost ?? "0 m²"} dried out`);
+  let sentence = `${parts.join(": ")}.`;
+  const cf = stepOf(trace, "changeformer");
+  const ratio = cf ? num(cf.step.outputs.change_ratio) : null;
+  if (cf && ratio != null && cf.step.outputs.model_mode !== "mock") {
+    sentence += ` ChangeFormer marks ${formatPercent(ratio)} of the scene as other land-cover change.`;
+  }
+  return sentence;
+}
+
+function deriveAnswerText(trace: OrchestratorTrace | null): Omit<AnswerView, "lead"> {
   const measured = deriveMeasurements(trace);
   for (const { tool, key } of ANSWER_TOOLS) {
     const hit = stepOf(trace, tool);

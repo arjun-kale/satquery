@@ -93,6 +93,7 @@ export async function buildReport(analysis: Analysis, set: SceneSet): Promise<Bl
   const generated = new Date().toISOString();
   const segments = answer.text && answer.tool !== "cross_modal_fusion" ? splitModelQuantities(answer.text) : null;
   const stated = segments?.some((s) => s.quantity);
+  const leadHtml = answer.lead ? `<p class="answer">${esc(answer.lead)}</p><p class="muted" style="font-size:12px">Measured from pixels — every number in this sentence comes from the rasters, not from a model.</p>` : "";
   const answerHtml = answer.text
     ? `<p class="answer">${(segments ?? [{ text: answer.text, quantity: false }]).map((s) => (s.quantity ? `<span class="stated">${esc(s.text)}</span>` : esc(s.text))).join("")}</p>${stated ? `<p class="muted" style="font-size:12px">Dotted-underlined numbers are the model's own wording, not measurements; measured values are listed under “Measured from pixels”.</p>` : ""}`
     : `<p class="answer">Unable to determine an answer from these images.</p>`;
@@ -145,7 +146,7 @@ export async function buildReport(analysis: Analysis, set: SceneSet): Promise<Bl
 
   <h2>Answer</h2>
   ${answer.isMock ? `<p class="warn">Produced in mock mode: the answer text and any model boxes or masks are placeholders, not a reading of these images. Measured values are computed from the pixels.</p>` : ""}
-  ${answerHtml}
+  ${leadHtml}${answer.lead && answer.text ? `<h3 style="font-size:13px;margin:16px 0 4px" class="muted">Model description${answer.note ? ` · ${esc(answer.note)}` : ""}</h3>` : ""}${answerHtml}
   <dl>
     <dt>Confidence</dt><dd>${esc(conf.available ? `${conf.band.word} (${conf.value.toFixed(2)})` : conf.reason)}</dd>
     <dt>Question type</dt><dd>${esc(task)} · ${esc(trace.routing_mode)} · similarity ${esc(trace.similarity_score?.toFixed(3) ?? "–")}</dd>
