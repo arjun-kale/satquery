@@ -9,7 +9,13 @@ Deploy: modal deploy modal_worker/infer.py
   No box in the output means no boxes returned.
 - ``confidence`` is the geometric-mean probability of the generated tokens under greedy decoding.
   It is a real model-derived number, but it is not a calibrated probability of correctness.
+- ``caption`` runs with the M2 adapter disabled (base weights). M2 was trained on
+  Lithuania/Summer BigEarthNet captions only, and on other scenes it reproduces that caption
+  template (wrong region, invented areas). ``answer`` and ``ground`` keep the adapter, where the
+  held-out evaluation showed gains. Every response reports the weights that actually produced it.
 """
+
+import contextlib
 
 import io
 import json
@@ -67,7 +73,9 @@ class GeoChatInfer:
             device_map={"": 0},
         )
         manifest = ADAPTER_DIR.parent / "final_manifest.json"
-        if manifest.exists():
+        self.base_weights = "geochat-7b (base weights, M2 adapter off)"
+        self.has_adapter = manifest.exists()
+        if self.has_adapter:
             from peft import PeftModel
 
             model = PeftModel.from_pretrained(model, str(ADAPTER_DIR))
@@ -78,7 +86,7 @@ class GeoChatInfer:
         self.model = model.eval()
         print(f"Loaded {self.weights}")
 
-    def _generate(self, png_bytes: bytes, question: str, max_new_tokens: int) -> tuple[str, float]:
+    def _generate(self, png_bytes: bytes, question: str, max_new_tokens: int, use_adapter: bool = True) -> tuple[str, float]:
         import torch
         from PIL import Image
         from satq_m2 import geochat as G
@@ -88,7 +96,8 @@ class GeoChatInfer:
         img = expand2square(img, tuple(int(x * 255) for x in self.improc.image_mean))
         pixel = self.improc(images=[img], return_tensors="pt")["pixel_values"].to("cuda", torch.bfloat16)
         ids = torch.tensor([G.build_inference_ids(question, self.tok)], device="cuda")
-        with torch.inference_mode():
+        base_only = self.model.disable_adapter() if self.has_adapter and not use_adapter else contextlib.nullcontext()
+        with torch.inference_mode(), base_only:
             out = self.model.generate(
                 input_ids=ids, attention_mask=torch.ones_like(ids), pixel_values=pixel,
                 do_sample=False, num_beams=1, max_new_tokens=max_new_tokens,
@@ -111,9 +120,10 @@ class GeoChatInfer:
     @modal.method()
     def caption(self, png_bytes: bytes, band_map: str = "B4/B3/B2") -> dict:
         text, conf = self._generate(
-            png_bytes, "Describe this satellite image, including the land cover types and their spatial layout.", 512
+            png_bytes, "Describe this satellite image, including the land cover types and their spatial layout.", 512,
+            use_adapter=False,
         )
-        return {"text": text, "confidence": conf, "weights": self.weights, "band_map": band_map}
+        return {"text": text, "confidence": conf, "weights": self.base_weights, "band_map": band_map}
 
     @modal.method()
     def ground(self, png_bytes: bytes, query: str, band_map: str = "B4/B3/B2") -> dict:
