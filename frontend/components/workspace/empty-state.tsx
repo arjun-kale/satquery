@@ -111,7 +111,7 @@ function DropTile({ kind }: { kind: SceneSetKind }) {
   );
 }
 
-function Samples({ offline }: { offline: boolean }) {
+export function Samples({ offline }: { offline: boolean }) {
   const { loadSample } = useActions();
   const dispatch = useDispatch();
   const [samples, setSamples] = useState<Sample[] | null>(null);

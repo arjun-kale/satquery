@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { MODALITY_LABEL, ROLE, SCENE_SET } from "@/lib/vocabulary";
 import { Button, StatusIcon, Tag } from "@/components/ui/primitives";
 import { useActions } from "./effects";
-import { ACCEPT } from "./empty-state";
+import { ACCEPT, Samples } from "./empty-state";
 import { useDispatch, useWorkspace, type Scene } from "./store";
 
 interface Upload {
@@ -204,6 +204,7 @@ export function SceneComposer() {
             );
           })}
         </ol>
+        {uploads.length === 0 && <Samples offline={state.health.state === "offline"} />}
         {tooMany && <p className="text-sm text-warning">A scene set holds at most two scenes; extra files were left out.</p>}
         {ordered.length === 2 && confirmed && (
           <div>

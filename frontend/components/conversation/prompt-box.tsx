@@ -54,8 +54,13 @@ export function PromptBox({
   // A new scene set: pre-fill a sample's suggested question and put the cursor in the box.
   useEffect(() => {
     if (!set) return;
-    if (!hasAnalyses && set.suggestedQuestion) setDraft(set.suggestedQuestion);
-    requestAnimationFrame(() => ref.current?.focus());
+    const prefill = !hasAnalyses && set.suggestedQuestion;
+    if (prefill) setDraft(set.suggestedQuestion!);
+    // Select a pre-filled question so Enter accepts it and typing replaces it (never appends to it).
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      if (prefill) ref.current?.select();
+    });
   }, [set?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
