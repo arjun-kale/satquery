@@ -11,7 +11,9 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("./data")
     database_path: Path = Path("./data/satquery.db")
-    model_mode: Literal["mock", "local", "modal"] = "mock"
+    # Real models by default (the demo path). "mock" is a developer fallback that returns
+    # labelled placeholders without GPU cost; set SATQUERY_MODEL_MODE=mock to opt in.
+    model_mode: Literal["mock", "local", "modal"] = "modal"
     cors_origins: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(

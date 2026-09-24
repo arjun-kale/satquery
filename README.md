@@ -22,7 +22,7 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 curl http://localhost:8000/health
-# {"status":"ok","database":"ok","model_mode":"mock"}
+# {"status":"ok","database":"ok","model_mode":"modal"}
 ```
 
 ### Sample scenes (optional, needs internet once)
@@ -43,7 +43,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` — top-right shows `BACKEND ONLINE / MOCK`.
+Open `http://localhost:3000`. The top bar shows **SatQuery VLM on GPU** when real models are in use.
+For UI work without GPU cost, start the backend with `SATQUERY_MODEL_MODE=mock`; every answer is then
+labelled as a mock placeholder.
 
 ### Tests
 

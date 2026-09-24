@@ -15,12 +15,12 @@ cd frontend
 npm run dev
 ```
 
-Open `http://localhost:3000`. Backend health indicator should show **BACKEND ONLINE / MOCK**.
+Open `http://localhost:3000`. The top bar should show **SatQuery VLM on GPU** (real models). A **Mock models** tag means the backend was started with `SATQUERY_MODEL_MODE=mock` — never demo in that state.
 
 Verify backend directly:
 ```bash
 curl http://localhost:8000/health
-# {"status":"ok","database":"ok","model_mode":"mock"}
+# {"status":"ok","database":"ok","model_mode":"modal"}
 ```
 
 ---
@@ -47,7 +47,7 @@ cloudflared tunnel --url http://localhost:8000
 
 | Variable | Where | Purpose |
 |---|---|---|
-| `SATQUERY_MODEL_MODE` | backend `.env` | `mock` / `local` / `modal` |
+| `SATQUERY_MODEL_MODE` | backend `.env` | `modal` (default, real models) / `mock` (dev only) / `local` |
 | `SATQUERY_CORS_ORIGINS` | backend `.env` | Allowed frontend origins |
 | `NEXT_PUBLIC_API_BASE_URL` | frontend `.env.local` | Backend base URL |
 
