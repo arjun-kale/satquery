@@ -52,3 +52,38 @@ def test_router_ambiguous_tie(router):
             # Because the query matches both template 0 and template 1 perfectly (score 1.0),
             # the tie margin is 0.0, which is < TIE_MARGIN. It must reject it!
             assert result.is_supported is False
+
+
+def test_two_images_route_by_scene_set_rule_with_real_score(router):
+    result = router.route("describe this satellite image", image_ids=["a", "b"])
+    assert result.query_type == QueryType.CHANGE_DETECTION
+    assert result.mode == "scene_set_rule"
+    assert result.score < 0.99  # the question is a caption request; the score says so
+    assert result.runner_up is not None
+
+
+def test_optical_sar_scene_set_routes_to_cross_modal(router):
+    result = router.route("what changed here", image_ids=["a", "b"], scene_set_kind="optical_sar")
+    assert result.query_type == QueryType.CROSS_MODAL
+    assert result.mode == "scene_set_rule"
+
+
+def test_change_question_on_one_image_needs_a_pair(router):
+    result = router.route("what has changed between these two images", image_ids=["a"])
+    assert result.is_supported is False
+    assert result.rejection == "needs_pair"
+    assert result.query_type == QueryType.CHANGE_DETECTION
+
+
+def test_low_score_rejection_offers_candidates(router):
+    result = router.route("how many cars are parked outside my house")
+    assert result.rejection == "low_score"
+    assert len(result.candidates) == 3
+    assert result.candidates[0].score >= result.candidates[1].score
+
+
+def test_user_choice_overrides_similarity(router):
+    result = router.route("how many cars are parked outside my house", forced_type=QueryType.OBJECT_GROUNDING)
+    assert result.is_supported is True
+    assert result.mode == "user_choice"
+    assert result.dag == ["preview", "geochat_grounding", "geodesy"]

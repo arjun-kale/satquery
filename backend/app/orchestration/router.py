@@ -1,7 +1,7 @@
 import numpy as np
 from enum import Enum
-from typing import Dict, List, Optional
-from pydantic import BaseModel
+from typing import Dict, List, Literal, Optional
+from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
 class QueryType(str, Enum):
@@ -59,11 +59,27 @@ QUERY_DAGS = {
     QueryType.CROSS_MODAL: ["compatibility", "preview", "sar_calibrate", "sar_despeckle", "mndwi", "cross_modal_fusion", "geochat_vqa"],
 }
 
+class Candidate(BaseModel):
+    task: QueryType
+    score: float
+
+
 class RoutingResult(BaseModel):
     query_type: Optional[QueryType]
     dag: List[str]
     score: float
     is_supported: bool
+    # How the task was chosen: embedding similarity, a scene-set rule (e.g. two dates → change),
+    # or the user picking an intent after the router was unsure.
+    mode: Literal["similarity", "scene_set_rule", "user_choice"] = "similarity"
+    runner_up: Optional[Candidate] = None
+    # Best similarity per task type, highest first — what the UI offers when the router is unsure.
+    candidates: List[Candidate] = Field(default_factory=list)
+    rejection: Optional[Literal["low_score", "ambiguous", "needs_pair"]] = None
+
+
+PAIR_TASKS = {QueryType.CHANGE_DETECTION, QueryType.CROSS_MODAL}
+
 
 class QueryRouter:
     """
@@ -74,55 +90,92 @@ class QueryRouter:
     """
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
-        
+
         self.template_types = []
-        
+
         for q_type, templates in CANONICAL_TEMPLATES.items():
             for t in templates:
                 self.template_types.append(q_type)
-                
+
         # Flatten templates to encode
         flat_templates = [t for templates in CANONICAL_TEMPLATES.values() for t in templates]
         self.template_embeddings = self.model.encode(flat_templates, convert_to_numpy=True)
-        
-    def route(self, query: str, image_ids: List[str] = None) -> RoutingResult:
+
+    def _similarities(self, query: str) -> Optional[np.ndarray]:
         query_emb = self.model.encode([query], convert_to_numpy=True)[0]
-        
-        # Cosine similarity
         norm_q = np.linalg.norm(query_emb)
         norm_t = np.linalg.norm(self.template_embeddings, axis=1)
-        
         if norm_q == 0 or np.any(norm_t == 0):
-            best_type = QueryType.CHANGE_DETECTION if (image_ids and len(image_ids) == 2) else None
+            return None
+        return np.dot(self.template_embeddings, query_emb) / (norm_t * norm_q)
+
+    def _per_type(self, similarities: np.ndarray) -> List[Candidate]:
+        best: Dict[QueryType, float] = {}
+        for q_type, sim in zip(self.template_types, similarities):
+            best[q_type] = max(best.get(q_type, -1.0), float(sim))
+        return sorted((Candidate(task=t, score=s) for t, s in best.items()), key=lambda c: -c.score)
+
+    def route(
+        self,
+        query: str,
+        image_ids: List[str] = None,
+        scene_set_kind: Optional[str] = None,
+        forced_type: Optional[QueryType] = None,
+    ) -> RoutingResult:
+        n_images = len(image_ids) if image_ids else 0
+        similarities = self._similarities(query)
+
+        if similarities is None:
+            best_type = QueryType.CHANGE_DETECTION if n_images == 2 else None
             return RoutingResult(query_type=best_type, dag=QUERY_DAGS[best_type] if best_type else [], score=0.0, is_supported=bool(best_type))
-            
-        similarities = np.dot(self.template_embeddings, query_emb) / (norm_t * norm_q)
-        
+
+        candidates = self._per_type(similarities)
+        score_of = {c.task: c.score for c in candidates}
+
+        def result(task: QueryType, mode: str) -> RoutingResult:
+            others = [c for c in candidates if c.task != task]
+            return RoutingResult(
+                query_type=task, dag=QUERY_DAGS[task], score=score_of[task], is_supported=True,
+                mode=mode, runner_up=others[0] if others else None, candidates=candidates[:3],
+            )
+
+        if forced_type is not None:
+            return result(forced_type, "user_choice")
+
+        # The scene set decides pair tasks: the question can't turn two dates into a SAR pair.
+        if scene_set_kind == "optical_sar":
+            return result(QueryType.CROSS_MODAL, "scene_set_rule")
+        if n_images == 2 and (scene_set_kind == "bitemporal" or candidates[0].task != QueryType.CROSS_MODAL):
+            return result(QueryType.CHANGE_DETECTION, "scene_set_rule")
+
         sorted_indices = np.argsort(similarities)[::-1]
         best_idx = sorted_indices[0]
         best_score = float(similarities[best_idx])
         best_type = self.template_types[best_idx]
-        
-        # Override for 2 images if not explicitly asking for cross modal
-        if image_ids and len(image_ids) == 2 and best_type != QueryType.CROSS_MODAL:
-            best_type = QueryType.CHANGE_DETECTION
-            best_score = 1.0
-            
+
+        def reject(kind: str) -> RoutingResult:
+            return RoutingResult(
+                query_type=None, dag=[], score=best_score, is_supported=False,
+                runner_up=candidates[1] if len(candidates) > 1 else None,
+                candidates=candidates[:3], rejection=kind,
+            )
+
         # Check threshold
-        if best_score < SIMILARITY_THRESHOLD and best_type != QueryType.CHANGE_DETECTION:
-            return RoutingResult(query_type=None, dag=[], score=best_score, is_supported=False)
-            
+        if best_score < SIMILARITY_THRESHOLD:
+            return reject("low_score")
+
         # Check tie margin (ambiguity)
         if len(sorted_indices) > 1:
             second_best_idx = sorted_indices[1]
             if self.template_types[second_best_idx] != best_type:
                 second_best_score = float(similarities[second_best_idx])
                 if (best_score - second_best_score) < TIE_MARGIN:
-                    return RoutingResult(query_type=None, dag=[], score=best_score, is_supported=False)
-                    
-        return RoutingResult(
-            query_type=best_type,
-            dag=QUERY_DAGS[best_type],
-            score=best_score,
-            is_supported=True
-        )
+                    return reject("ambiguous")
+
+        # A pair task asked about one image can't run; say so instead of failing mid-run.
+        if n_images == 1 and best_type in PAIR_TASKS:
+            rejected = reject("needs_pair")
+            rejected.query_type = best_type
+            return rejected
+
+        return result(best_type, "similarity")
