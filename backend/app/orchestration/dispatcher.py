@@ -295,6 +295,7 @@ def dispatch_tool(
             "confidence": result.confidence,
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
+            "weights": result.weights,
         }
 
     # ------------------------------------------------------------------
@@ -311,6 +312,7 @@ def dispatch_tool(
             "confidence": result.confidence,
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
+            "weights": result.weights,
         }
 
     # ------------------------------------------------------------------
@@ -340,6 +342,7 @@ def dispatch_tool(
         boxes_path.write_text(json.dumps(box_list))
 
         return {
+            "weights": getattr(adapter, "last_weights", None),
             "grounding_boxes": box_list,
             "boxes_url": f"/api/jobs/{job_id}/artifacts/grounding_boxes.json",
         }
@@ -475,6 +478,7 @@ def dispatch_tool(
             "confidence": result.confidence,
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
+            "weights": result.weights,
         }
 
     # ------------------------------------------------------------------

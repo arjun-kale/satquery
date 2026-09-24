@@ -42,6 +42,7 @@ class GeoChatAdapter(BaseModelAdapter):
     def __init__(self, mode: Literal["local", "modal"] = "local") -> None:
         self._mode = mode
         self._cls = None
+        self.last_weights: str | None = None
         if self._mode == "modal":
             import modal
 
@@ -71,6 +72,7 @@ class GeoChatAdapter(BaseModelAdapter):
             confidence=float(res.get("confidence", 0.0)),
             confidence_source="model-provided",
             model_mode="modal",
+            weights=res.get("weights"),
         )
 
     def answer(self, preview_png: bytes, query: str, *, band_map: str) -> ModelResult:
@@ -81,11 +83,13 @@ class GeoChatAdapter(BaseModelAdapter):
             confidence=float(res.get("confidence", 0.0)),
             confidence_source="model-provided",
             model_mode="modal",
+            weights=res.get("weights"),
         )
 
     def ground(self, preview_png: bytes, query: str, *, band_map: str) -> list[GroundingBox]:
         _validate_preview(preview_png, band_map)
         res = self._remote("ground", preview_png, query, band_map=band_map)
+        self.last_weights = res.get("weights")
         return [
             GroundingBox(
                 label=box["label"],

@@ -46,6 +46,8 @@ class ModelResult:
     confidence: float
     confidence_source: Literal["model-provided", "rule-derived", "unavailable"]
     model_mode: Literal["mock", "local", "modal"]
+    # Which weights produced this output, as reported by the inference worker.
+    weights: str | None = None
 
 
 class BaseModelAdapter(ABC):
