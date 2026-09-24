@@ -68,3 +68,15 @@ No credentials required for Phase 0–1.
   browser (`localStorage`), not an SQLite analyses table.
 - **Pixel values under the cursor / σ⁰ readout:** not available — the browser only has the 512 px
   quick-look, so the readout shows pixel coordinates and lat/lon only.
+
+---
+
+## Scene descriptions run on base weights
+
+**Status:** Open (2026-09-24). On out-of-distribution scenes (e.g. Bengaluru) the M2 adapter
+reproduced its BigEarthNet Lithuania/Summer caption template, including invented areas. `caption`
+now runs with the adapter disabled; `answer` and `ground` keep it. Each response's `weights` field
+records which weights ran, and the UI credits the M2 adapter only where it was used. Base-weight
+captions still hallucinate some object types (e.g. "baseball diamonds"). The real fix is training
+M2 on more regions and seasons. Quantities inside model text are marked in the UI and report as
+the model's wording, not measurements.
