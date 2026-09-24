@@ -53,6 +53,12 @@ function AnswerCard({ analysis, set, isActive, onAsk, onReport, reportState }: P
 
       {answer.text ? (
         <ModelText text={answer.text} fromModel={!!answer.tool && answer.tool !== "cross_modal_fusion"} />
+      ) : !answer.tool && answer.measured.length ? (
+        <p className="text-lg text-fg">
+          <span className="text-fg-muted">{answer.measured[0].label}:</span>{" "}
+          <span className="font-mono tabular">{answer.measured[0].value}</span>
+          <span className="ml-2 align-middle text-xs text-fg-faint">measured from pixels, no model text for this question</span>
+        </p>
       ) : (
         <p className="text-lg text-fg-muted">Unable to determine an answer from these images.</p>
       )}

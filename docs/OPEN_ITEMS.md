@@ -59,9 +59,12 @@ No credentials required for Phase 0–1.
   cold-start event: the UI only says the GPU worker *may* be starting after 15 s on a VLM step).
 - **Stop (§8.5):** `POST /api/jobs/{id}/cancel` stops the run *before the next step*; a step that
   is already running (e.g. a Modal GPU call) finishes first. The UI labels Stop that way.
-- **Placeholder steps:** `sar_calibrate`, `sar_despeckle`, `mndwi` and `geochat_summary` return
-  `{"simulated": true}` — no computation runs. The UI marks them "Placeholder step". The SAR DAG
-  needs calibration metadata before these can be wired to `app/tools/sar.py`.
+- **SAR steps (resolved 2026-09-24):** `sar_calibrate` checks the file's metadata and skips calibration
+  for already-calibrated products (e.g. Sentinel-1 RTC), applies `app/tools/sar.calibrate` when
+  `calibration_factor` / `incidence_angle_deg` are present, and fails plainly otherwise.
+  `sar_despeckle` runs the Lee filter; `sar_water` outlines VV < −18 dB. The router is v1.1.0.
+- **Water change (2026-09-24):** `index_change` outlines water gained / lost by differencing MNDWI
+  (or NDWI) between T1 and T2 — a deterministic rule, labelled as such, that runs before ChangeFormer.
 - **ChangeFormer:** no weights are loaded, so change detection only works in mock mode (fixed
   placeholder mask, labelled as such). In `modal` mode the step fails with a plain message.
 - **Persistence:** analyses are restored from the backend's own traces, keyed by ids kept in the

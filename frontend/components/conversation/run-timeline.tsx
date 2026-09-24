@@ -167,7 +167,7 @@ function StepRow({ row, now, coldStartPossible }: { row: TimelineRow; now: numbe
       status={status}
       label={row.label}
       shimmer={row.status === "active"}
-      detail={row.simulated ? "Placeholder step — no computation ran" : row.detail ?? undefined}
+      detail={row.simulated ? "Placeholder step — no computation ran" : row.reason ?? row.detail ?? undefined}
       mono={[row.model, row.tool].filter(Boolean).join(" · ")}
       time={ms != null ? formatSeconds(ms) : undefined}
       error={row.error}

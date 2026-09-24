@@ -182,3 +182,75 @@ def test_executor_stops_before_next_step_when_cancelled(executor, job_repo):
     assert trace.trace.cancelled is True
     assert trace.trace.steps == []
     assert job_repo.get(job.id).failure_reason == CANCELLED_REASON
+
+
+def _water_tif(path, water_cols: int, size=64):
+    """4-band S2-like scene: columns < water_cols are water (green > NIR), the rest are land."""
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_origin
+
+    names = ("B04", "B03", "B02", "B08")
+    data = np.full((4, size, size), 1000, dtype="uint16")
+    data[3] = 2000  # NIR above green → land
+    data[1, :, :water_cols] = 3000  # green above NIR → water
+    with rasterio.open(path, "w", driver="GTiff", width=size, height=size, count=4, dtype="uint16",
+                       crs="EPSG:32643", transform=from_origin(700000, 1400000, 10, 10)) as ds:
+        ds.write(data)
+        for i, n in enumerate(names, start=1):
+            ds.set_band_description(i, n)
+
+
+def _sar_tif(path, tags, size=64):
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_origin
+
+    vv = np.full((size, size), 0.1, dtype="float32")  # −10 dB: land
+    vv[:, : size // 4] = 0.005  # −23 dB: open water
+    with rasterio.open(path, "w", driver="GTiff", width=size, height=size, count=1, dtype="float32",
+                       crs="EPSG:32643", transform=from_origin(700000, 1400000, 10, 10)) as ds:
+        ds.write(vv, 1)
+        ds.update_tags(**tags)
+
+
+def test_index_change_measures_water_gained(executor, job_repo, artifact_repo):
+    _water_tif(artifact_repo.upload_path("dry"), water_cols=16)
+    _water_tif(artifact_repo.upload_path("wet"), water_cols=48)
+    job = job_repo.create()
+
+    trace = executor.execute(job.id, "what changed", {"image_ids": ["dry", "wet"]}, scene_set_kind="bitemporal")
+
+    out = {s.tool_name: s for s in trace.trace.steps}["index_change"].outputs
+    assert out["index_type"] == "NDWI"
+    assert out["water_fraction_t1"] == 0.25 and out["water_fraction_t2"] == 0.75
+    assert out["gained_area_m2"] == 32 * 64 * 100  # 32 columns × 64 rows at 10 m
+    assert out["lost_area_m2"] == 0
+    assert out["gained_regions"][0]["area_m2"] == 32 * 64 * 100
+
+
+def test_sar_water_on_calibrated_input(executor, job_repo, artifact_repo):
+    _sar_tif(artifact_repo.upload_path("s1"), {"modality": "sar", "sensor": "Sentinel-1 C-SAR (RTC, gamma0 linear)"})
+    job = job_repo.create()
+
+    trace = executor.execute(job.id, "find water in this SAR image", {"image_ids": ["s1"]})
+
+    steps = {s.tool_name: s for s in trace.trace.steps}
+    assert trace.trace.planned_steps == ["sar_calibrate", "sar_despeckle", "sar_water"]
+    assert steps["sar_calibrate"].outputs["applied"] is False  # already calibrated: nothing to redo
+    assert steps["sar_despeckle"].outputs["window_size"] == 5
+    water = steps["sar_water"].outputs
+    # The Lee filter blurs the edge by up to 2 px either side; the water strip is 16 of 64 columns.
+    assert 0.22 <= water["target_fraction"] <= 0.28
+    assert water["sar_water_regions"]
+
+
+def test_sar_without_calibration_metadata_fails_plainly(executor, job_repo, artifact_repo):
+    _sar_tif(artifact_repo.upload_path("dn"), {"modality": "sar", "sensor": "Sentinel-1 GRD (DN)"})
+    job = job_repo.create()
+
+    trace = executor.execute(job.id, "find water in this SAR image", {"image_ids": ["dn"]})
+
+    failed = trace.trace.steps[0]
+    assert failed.tool_name == "sar_calibrate" and failed.status == "FAILED"
+    assert "calibration_factor" in failed.error

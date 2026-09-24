@@ -76,6 +76,24 @@ export function deriveEvidence(trace: OrchestratorTrace | null): Evidence[] {
     }
   }
 
+  const ic = stepOf(trace, "index_change");
+  if (ic) {
+    const name = str(ic.step.outputs.index_type) ?? "water index";
+    for (const [key, title] of [["gained_regions", "Water gained"], ["lost_regions", "Water lost"]] as const) {
+      for (const r of (ic.step.outputs[key] as RegionOut[] | undefined) ?? []) {
+        out.push(ruleRegion(r, title, `Rule outline: ${name} T1 → T2 (water = ${name} > 0)`, "change", ic.index, "index_change"));
+      }
+    }
+  }
+
+  const sar = stepOf(trace, "sar_water");
+  if (sar) {
+    const rule = str(sar.step.outputs.rule) ?? "SAR threshold rule";
+    for (const r of (sar.step.outputs.sar_water_regions as RegionOut[] | undefined) ?? []) {
+      out.push(ruleRegion(r, "Water (SAR)", `Rule outline: ${rule}`, "evidence", sar.index, "sar_water"));
+    }
+  }
+
   const index = stepOf(trace, "spectral_index");
   if (index) {
     const rule = str(index.step.outputs.rule) ?? "threshold rule";
@@ -117,7 +135,28 @@ export function deriveEvidence(trace: OrchestratorTrace | null): Evidence[] {
     }
   }
 
-  return out.slice(0, CIRCLED.length).map((e, i) => ({ ...e, n: i + 1 }));
+  // Largest first across all sources, so the nine numbered slots go to the regions that matter most.
+  return out
+    .map((e, i) => ({ e, i }))
+    .sort((x, y) => (y.e.areaM2 ?? 0) - (x.e.areaM2 ?? 0) || x.i - y.i)
+    .slice(0, CIRCLED.length)
+    .map(({ e }, i) => ({ ...e, n: i + 1 }));
+}
+
+function ruleRegion(r: RegionOut, title: string, honesty: string, tone: "evidence" | "change", index: number, tool: string): Omit<Evidence, "n"> {
+  return {
+    kind: "contour",
+    tone,
+    title,
+    honesty,
+    bbox: r.bbox,
+    rings: r.rings,
+    areaM2: r.area_m2,
+    confidence: { available: false, reason: "Rule output — a measurement, not a model guess" },
+    line: "solid",
+    producedBy: { index, tool },
+    isMock: false,
+  };
 }
 
 /* ------------------------------------------------------------------ answer */
@@ -214,6 +253,32 @@ export function deriveAnswer(trace: OrchestratorTrace | null): AnswerView {
 function deriveMeasurements(trace: OrchestratorTrace | null): Measurement[] {
   const out: Measurement[] = [];
 
+  const ic = stepOf(trace, "index_change");
+  if (ic) {
+    const o = ic.step.outputs;
+    const name = str(o.index_type) ?? "index";
+    const method = `Pixels with ${name} > 0 × pixel ground area`;
+    const pair = (a: unknown, f: unknown) => [formatArea(num(a)), num(f) != null ? `${formatPercent(num(f)!)} of scene` : null].filter(Boolean).join(" · ");
+    out.push({ label: "Water at T1", value: pair(o.water_area_t1_m2, o.water_fraction_t1), method });
+    out.push({ label: "Water at T2", value: pair(o.water_area_t2_m2, o.water_fraction_t2), method });
+    const gained = formatArea(num(o.gained_area_m2));
+    const lost = formatArea(num(o.lost_area_m2));
+    if (gained) out.push({ label: "Water gained", value: gained, method: "Dry at T1 and water at T2" });
+    if (lost) out.push({ label: "Water lost", value: lost, method: "Water at T1 and dry at T2" });
+  }
+
+  const sar = stepOf(trace, "sar_water");
+  if (sar) {
+    const o = sar.step.outputs;
+    const frac = num(o.target_fraction);
+    if (frac != null)
+      out.push({
+        label: `Water (VV < ${num(o.threshold_db) ?? -18} dB)`,
+        value: [formatPercent(frac), formatArea(num(o.target_area_m2))].filter(Boolean).join(" · "),
+        method: "Despeckled SAR pixels below the dB threshold × pixel ground area",
+      });
+  }
+
   const index = stepOf(trace, "spectral_index");
   if (index) {
     const o = index.step.outputs;
@@ -284,6 +349,28 @@ export function deriveJobLayers(trace: OrchestratorTrace | null): JobLayer[] {
       tone: "evidence",
       legend: "Red → green: low → high (2–98 % stretch)",
     });
+  const ic = stepOf(trace, "index_change");
+  const icu = ic && str(ic.step.outputs.change_raster_url);
+  if (ic && icu)
+    out.push({
+      id: "index-change",
+      label: "Water change raster",
+      url: icu,
+      producedBy: { index: ic.index, tool: "index_change" },
+      tone: "change",
+      legend: "Solid orange: water gained · faint orange: water lost",
+    });
+  const sarw = stepOf(trace, "sar_water");
+  const sw = sarw && str(sarw.step.outputs.mask_url);
+  if (sarw && sw)
+    out.push({
+      id: "sar-water",
+      label: "SAR water mask",
+      url: sw,
+      producedBy: { index: sarw.index, tool: "sar_water" },
+      tone: "sar",
+      legend: "Blue: despeckled VV below the dB threshold",
+    });
   const change = stepOf(trace, "changeformer");
   const cm = change && str(change.step.outputs.change_mask_url);
   if (change && cm)
@@ -322,6 +409,8 @@ export interface TimelineRow {
   ms: number | null;
   startedAt: string | null;
   simulated: boolean;
+  /** A step that decided not to act says why (e.g. input already calibrated). */
+  reason: string | null;
   error: string | null;
 }
 
@@ -350,6 +439,7 @@ export function deriveTimeline(trace: OrchestratorTrace | null, stopped: boolean
       ms: step?.latency_ms ?? null,
       startedAt: step?.start_time ?? null,
       simulated: step?.outputs?.simulated === true,
+      reason: typeof step?.outputs?.reason === "string" ? step.outputs.reason : null,
       error: step?.error ?? null,
     };
   });

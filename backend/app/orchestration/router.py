@@ -13,7 +13,7 @@ class QueryType(str, Enum):
     CROSS_MODAL = "CROSS_MODAL"
 
 # Fixed version for reproducibility
-ROUTER_VERSION = "v1.0.0"
+ROUTER_VERSION = "v1.1.0"  # 1.1: real SAR steps and index-change in the DAGs
 SIMILARITY_THRESHOLD = 0.60
 TIE_MARGIN = 0.10
 
@@ -54,9 +54,9 @@ QUERY_DAGS = {
     QueryType.SPECTRAL_WATER_VEGETATION: ["preview", "spectral_index", "geochat_vqa", "geodesy"],
     QueryType.CAPTION_SCENE: ["preview", "geochat_caption"],
     QueryType.OBJECT_GROUNDING: ["preview", "geochat_grounding", "geodesy"],
-    QueryType.CHANGE_DETECTION: ["compatibility", "preview", "changeformer", "change_area", "change_vqa"],
-    QueryType.SAR_WATER: ["sar_calibrate", "sar_despeckle", "mndwi", "geochat_summary"],
-    QueryType.CROSS_MODAL: ["compatibility", "preview", "sar_calibrate", "sar_despeckle", "mndwi", "cross_modal_fusion", "geochat_vqa"],
+    QueryType.CHANGE_DETECTION: ["compatibility", "preview", "index_change", "changeformer", "change_area", "change_vqa"],
+    QueryType.SAR_WATER: ["sar_calibrate", "sar_despeckle", "sar_water"],
+    QueryType.CROSS_MODAL: ["compatibility", "preview", "sar_calibrate", "sar_despeckle", "sar_water", "cross_modal_fusion", "geochat_vqa"],
 }
 
 class Candidate(BaseModel):

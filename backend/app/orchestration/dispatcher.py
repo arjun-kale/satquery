@@ -58,11 +58,11 @@ def _index_to_png(index_array: np.ndarray, colormap: str = "RdYlGn") -> bytes:
     return buf.getvalue()
 
 
-def _mask_to_png(mask: np.ndarray) -> bytes:
-    """Convert a boolean change mask to a red-highlight RGBA PNG."""
+def _mask_to_png(mask: np.ndarray, rgb: tuple[int, int, int] = (220, 0, 0)) -> bytes:
+    """Convert a boolean mask to a semi-transparent single-colour RGBA PNG."""
     h, w = mask.shape
     rgba = np.zeros((h, w, 4), dtype=np.uint8)
-    rgba[mask, 0] = 220  # red channel
+    rgba[mask, :3] = rgb
     rgba[mask, 3] = 180  # semi-transparent
 
     img = Image.fromarray(rgba, "RGBA")
@@ -126,6 +126,93 @@ def _downsample_mask(mask: np.ndarray, max_side: int) -> tuple[np.ndarray, tuple
     hh, ww = (h // fy) * fy, (w // fx) * fx
     blocks = mask[:hh, :ww].reshape(hh // fy, fy, ww // fx, fx)
     return blocks.mean(axis=(1, 3)) >= 0.5, (fx, fy)
+
+
+SAR_WATER_DB = -18.0  # common open-water threshold for C-band VV backscatter
+
+
+def _scene_pixel_area_m2(artifact_repo: ArtifactRepository, image_id: str) -> float | None:
+    """Ground area of one native pixel, from the GeoTIFF transform."""
+    with rasterio.MemoryFile(_load_tif_bytes(artifact_repo, image_id)) as mem:
+        with mem.open() as ds:
+            if not (ds.crs and ds.transform):
+                return None
+            return change_area_m2(np.ones((1, 1), dtype=bool), ds.transform, ds.crs)
+
+
+def _sar_image_id(artifact_repo: ArtifactRepository, image_ids: list[str]) -> str:
+    """The scene declared as SAR in its tags (the file says so; nothing is guessed)."""
+    for image_id in image_ids:
+        with rasterio.MemoryFile(_load_tif_bytes(artifact_repo, image_id)) as mem:
+            with mem.open() as ds:
+                tags = ds.tags()
+        sensor = " ".join(tags.get(k, "") for k in ("modality", "sensor", "SENSOR")).lower()
+        if "sar" in sensor or "sentinel-1" in sensor:
+            return image_id
+    raise ValueError("No scene in this scene set is declared as SAR in its metadata.")
+
+
+def _water_index(ds) -> tuple[np.ndarray, str, dict[str, str]]:
+    """MNDWI when a SWIR band is declared, else NDWI; raises when neither is possible."""
+    bands = _named_bands(ds)
+    for name, fn, roles in (("MNDWI", compute_mndwi, ("green", "swir")), ("NDWI", compute_ndwi, ("green", "nir"))):
+        if all(r in bands for r in roles):
+            arrays = [ds.read(bands[r][0]).astype(float) for r in roles]
+            return fn(*arrays)["array"], name, {r: f"band {bands[r][0]} ({bands[r][1]})" for r in roles}
+    declared = ", ".join(sorted(bands)) or "none declared"
+    raise ValueError(f"A water index needs green plus NIR or SWIR bands; this scene declares: {declared}.")
+
+
+def _index_change(artifact_repo: ArtifactRepository, job_id: str, id_a: str, id_b: str) -> dict[str, Any]:
+    """Water gained / lost between T1 and T2 by differencing a water index — a deterministic rule,
+    reported as such, not a learned change model."""
+    with rasterio.MemoryFile(_load_tif_bytes(artifact_repo, id_a)) as mem_a:
+        with mem_a.open() as ds_a:
+            idx_a, name_a, bands_a = _water_index(ds_a)
+            shape = (ds_a.height, ds_a.width)
+    with rasterio.MemoryFile(_load_tif_bytes(artifact_repo, id_b)) as mem_b:
+        with mem_b.open() as ds_b:
+            if (ds_b.height, ds_b.width) != shape:
+                raise ValueError("index_change: T1 and T2 pixel grids differ; resample them to one grid first.")
+            idx_b, name_b, bands_b = _water_index(ds_b)
+    if name_a != name_b:
+        raise ValueError(f"index_change: T1 supports {name_a} but T2 only {name_b}; the dates must use the same index.")
+
+    valid = np.isfinite(idx_a) & np.isfinite(idx_b)
+    water_a = (np.nan_to_num(idx_a, nan=-1) > 0) & valid
+    water_b = (np.nan_to_num(idx_b, nan=-1) > 0) & valid
+    gained = ~water_a & water_b & valid
+    lost = water_a & ~water_b & valid
+
+    one_px = _scene_pixel_area_m2(artifact_repo, id_a)
+    def regions(mask: np.ndarray) -> list[dict[str, Any]]:
+        coarse, f = _downsample_mask(mask, 512)
+        return mask_to_regions(coarse, one_px * f[0] * f[1] if one_px else None)
+    def area(mask: np.ndarray) -> float | None:
+        return round(int(np.count_nonzero(mask)) * one_px, 2) if one_px else None
+
+    rgba = np.zeros((*shape, 4), dtype=np.uint8)
+    rgba[gained] = (251, 146, 60, 200)
+    rgba[lost] = (251, 146, 60, 90)
+    buf = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buf, format="PNG")
+    artifact_repo.artifact_path(job_id, "index_change.png").write_bytes(buf.getvalue())
+
+    total = int(valid.sum()) or 1
+    return {
+        "index_type": name_a,
+        "bands_used": {"T1": bands_a, "T2": bands_b},
+        "rule": f"{name_a} > 0 is water; gained = dry at T1 and water at T2, lost = the reverse",
+        "water_fraction_t1": round(int(water_a.sum()) / total, 4),
+        "water_fraction_t2": round(int(water_b.sum()) / total, 4),
+        "water_area_t1_m2": area(water_a),
+        "water_area_t2_m2": area(water_b),
+        "gained_area_m2": area(gained),
+        "lost_area_m2": area(lost),
+        "gained_regions": regions(gained),
+        "lost_regions": regions(lost),
+        "change_raster_url": f"/api/jobs/{job_id}/artifacts/index_change.png",
+    }
 
 
 def _mask_pixel_area_m2(
@@ -501,14 +588,85 @@ def dispatch_tool(
         }
 
     # ------------------------------------------------------------------
-    elif tool_name in ("sar_calibrate", "sar_despeckle"):
-        # app.tools.sar implements these, but calibration constants must come from product
-        # metadata the ingest path doesn't carry yet — so nothing is computed here, and the
-        # trace says so instead of reporting invented parameters.
+    elif tool_name == "sar_calibrate":
+        sar_id = _sar_image_id(artifact_repo, image_ids)
+        with rasterio.MemoryFile(_load_tif_bytes(artifact_repo, sar_id)) as mem:
+            with mem.open() as ds:
+                tags = ds.tags()
+                vv = ds.read(1).astype(np.float32)
+        described = " ".join(tags.get(k, "") for k in ("sensor", "SENSOR", "calibration", "units")).lower()
+        if any(t in described for t in ("rtc", "gamma0", "sigma0", "γ0", "σ0")):
+            # Terrain-corrected / calibrated products are already backscatter: calibrating again
+            # would be wrong, so the step records that decision instead of pretending to run.
+            np.save(str(artifact_repo.artifact_path(job_id, "sar_linear.npy")), vv)
+            return {
+                "applied": False,
+                "reason": "Input is already calibrated backscatter (declared in the file's metadata); no calibration needed.",
+                "sar_image_id": sar_id,
+                "units": "linear backscatter",
+            }
+        factor, angle = tags.get("calibration_factor"), tags.get("incidence_angle_deg")
+        if not (factor and angle):
+            raise ValueError(
+                "This SAR file is not declared as calibrated and has no calibration_factor / "
+                "incidence_angle_deg metadata. Upload a calibrated product (e.g. Sentinel-1 RTC or GRD σ⁰)."
+            )
+        from app.tools.sar import calibrate
+        sigma0 = calibrate(vv, float(factor), np.deg2rad(float(angle)))
+        np.save(str(artifact_repo.artifact_path(job_id, "sar_linear.npy")), sigma0)
         return {
-            "simulated": True,
-            "note": f"{tool_name} is not wired to product calibration metadata yet; no computation ran.",
+            "applied": True,
+            "calibration_factor": float(factor),
+            "incidence_angle_deg": float(angle),
+            "sar_image_id": sar_id,
+            "units": "linear σ⁰",
         }
+
+    elif tool_name == "sar_despeckle":
+        from app.tools.sar import despeckle
+        path = artifact_repo.artifact_path(job_id, "sar_linear.npy")
+        if not path.exists():
+            raise RuntimeError("sar_despeckle: run sar_calibrate first")
+        linear = np.load(str(path))
+        window = 5
+        filtered = despeckle(linear, window_size=window)
+        np.save(str(artifact_repo.artifact_path(job_id, "sar_despeckled.npy")), filtered.astype(np.float32))
+        return {
+            "method": "Lee filter (uniform-window approximation)",
+            "window_size": window,
+            "band": "band 1 (VV)",
+            "pixels": int(filtered.size),
+        }
+
+    elif tool_name == "sar_water":
+        path = artifact_repo.artifact_path(job_id, "sar_despeckled.npy")
+        if not path.exists():
+            raise RuntimeError("sar_water: run sar_despeckle first")
+        linear = np.load(str(path))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            db = 10.0 * np.log10(np.where(linear > 0, linear, np.nan))
+        water = np.nan_to_num(db, nan=0.0) < SAR_WATER_DB
+        sar_id = _sar_image_id(artifact_repo, image_ids)
+        one_px = _scene_pixel_area_m2(artifact_repo, sar_id)
+        coarse, factor = _downsample_mask(water, 512)
+        regions = mask_to_regions(coarse, one_px * factor[0] * factor[1] if one_px else None)
+        artifact_repo.artifact_path(job_id, "sar_water.png").write_bytes(_mask_to_png(water, (96, 165, 250)))
+        covered = int(np.count_nonzero(water))
+        return {
+            "rule": f"VV (despeckled) < {SAR_WATER_DB:g} dB → open water",
+            "threshold_db": SAR_WATER_DB,
+            "target": "water",
+            "target_pixels": covered,
+            "target_fraction": round(covered / water.size, 4),
+            "target_area_m2": round(covered * one_px, 2) if one_px else None,
+            "sar_water_regions": regions,
+            "mask_url": f"/api/jobs/{job_id}/artifacts/sar_water.png",
+        }
+
+    elif tool_name == "index_change":
+        if not (image_id_a and image_id_b):
+            raise ValueError("index_change: requires two image_ids")
+        return _index_change(artifact_repo, job_id, image_id_a, image_id_b)
 
     elif tool_name == "compatibility":
         if not (image_id_a and image_id_b):
@@ -521,8 +679,6 @@ def dispatch_tool(
             raise ValueError(report.rejection_reason)
         return {"compatible": True}
 
-    elif tool_name in ("geochat_summary", "mndwi"):
-        return {"simulated": True, "note": f"{tool_name} is a placeholder step; no computation ran."}
 
 
     # ------------------------------------------------------------------

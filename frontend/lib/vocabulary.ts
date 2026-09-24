@@ -53,14 +53,14 @@ export const TOOL: Record<string, { label: string; detail?: string; model: Model
   geochat_caption: { label: "Describing the scene", model: "vlm" },
   geochat_grounding: { label: "Locating objects", model: "vlm" },
   geodesy: { label: "Placing it on the ground", detail: "footprint · area", model: null },
+  index_change: { label: "Comparing water between dates", detail: "water-index difference · rule", model: null },
   changeformer: { label: "Finding what changed", model: "change" },
   change_area: { label: "Measuring the changed area", detail: "mask pixels × GSD²", model: null },
   change_vqa: { label: "Describing the change", detail: "sees the T1 quick-look", model: "vlm" },
-  sar_calibrate: { label: "Calibrating the SAR scene", model: null },
-  sar_despeckle: { label: "Reducing SAR speckle", model: null },
-  mndwi: { label: "Water index", model: null },
+  sar_calibrate: { label: "Checking SAR calibration", model: null },
+  sar_despeckle: { label: "Reducing SAR speckle", detail: "Lee filter · 5×5", model: null },
+  sar_water: { label: "Finding water in the SAR scene", detail: "VV below −18 dB · rule", model: null },
   cross_modal_fusion: { label: "Fusing optical and SAR", detail: "SAR intensity as red overlay", model: null },
-  geochat_summary: { label: "Summarising", model: "vlm" },
 };
 
 export function toolLabel(tool: string): string {
