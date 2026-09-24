@@ -48,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["x-vercel-ai-ui-message-stream"],
     )
     app.add_api_route(
         "/health",
@@ -59,9 +60,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.api.report import router as report_router
     from app.api.scene_sets import router as scene_sets_router
     from app.api.samples import router as samples_router
+    from app.api.chat import router as chat_router
     app.include_router(ingest_router)
     app.include_router(scene_sets_router)
     app.include_router(samples_router)
+    app.include_router(chat_router)
     app.include_router(jobs_router)
     app.include_router(report_router)
     return app

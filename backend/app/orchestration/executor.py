@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import json
 import time
-from typing import Any
+from typing import Any, Callable
 
 from app.orchestration.cancel import clear as cancel_clear, is_cancel_requested
 from app.orchestration.router import QueryRouter, QueryType, ROUTER_VERSION, SIMILARITY_THRESHOLD
@@ -37,11 +37,14 @@ class DAGExecutor:
         job_repo: JobRepository,
         artifact_repo: ArtifactRepository,
         model_mode: str = "mock",
+        on_trace: Callable[[ObservableExecutionTrace], None] | None = None,
     ) -> None:
         self.router = router
         self.job_repo = job_repo
         self.artifact_repo = artifact_repo
         self.model_mode = model_mode
+        # Called after every trace write — the streaming endpoint turns these into SSE parts.
+        self.on_trace = on_trace
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -50,6 +53,8 @@ class DAGExecutor:
     def _save_trace(self, job_id: str, trace_obj: ObservableExecutionTrace) -> None:
         path = self.artifact_repo.artifact_path(job_id, "trace.json")
         path.write_text(trace_obj.model_dump_json())
+        if self.on_trace:
+            self.on_trace(trace_obj)
 
     # ------------------------------------------------------------------
     # Main entry point (called from BackgroundTasks)
