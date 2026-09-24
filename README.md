@@ -34,6 +34,15 @@ cd backend && .venv/bin/python scripts/fetch_samples.py
 Fetches small crops of open Copernicus Sentinel-2 / Sentinel-1 scenes into `backend/data/samples/`
 so the empty state offers one-click samples (reservoir two dates, city single image, optical + SAR).
 
+### Change-detection weights (needed for two-date questions)
+
+```bash
+cd backend && .venv/bin/python scripts/fetch_changeformer.py
+```
+
+Downloads the public ChangeFormer V6 DSIFN-CD checkpoint (MIT, ~1 GB zip → 164 MB weights) into
+`backend/data/models/changeformer/`. It runs locally on CPU; no GPU needed.
+
 ### Frontend
 
 ```bash
