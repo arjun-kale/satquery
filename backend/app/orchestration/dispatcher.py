@@ -23,7 +23,7 @@ from PIL import Image
 
 from app.storage.artifacts import ArtifactRepository
 from app.ingestion.preview import render_preview
-from app.tools.spectral import compute_ndvi, compute_mndwi, compute_ndbi
+from app.tools.spectral import compute_ndvi, compute_ndwi, compute_mndwi, compute_ndbi
 from app.tools.geodesy import bounding_box_wgs84, change_area_m2
 
 
@@ -32,10 +32,7 @@ from app.tools.geodesy import bounding_box_wgs84, change_area_m2
 # ---------------------------------------------------------------------------
 
 def _load_tif_bytes(artifact_repo: ArtifactRepository, image_id: str) -> bytes:
-    path = artifact_repo.upload_path(image_id)
-    if not path.exists():
-        raise FileNotFoundError(f"Uploaded file not found: {path}")
-    return path.read_bytes()
+    return artifact_repo.find_upload(image_id).read_bytes()
 
 
 def _index_to_png(index_array: np.ndarray, colormap: str = "RdYlGn") -> bytes:
@@ -72,6 +69,121 @@ def _mask_to_png(mask: np.ndarray) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+# Sentinel-2 / Landsat style band names → role. Band identity must come from the file
+# (band descriptions or a "bands" tag); positions alone say nothing about wavelength.
+_BAND_ROLES = {
+    "blue": {"B02", "B2", "BLUE"},
+    "green": {"B03", "B3", "GREEN"},
+    "red": {"B04", "B4", "RED"},
+    "nir": {"B08", "B8", "B8A", "NIR"},
+    "swir": {"B11", "SWIR", "SWIR1", "SWIR16"},
+}
+
+
+def _named_bands(ds) -> dict[str, tuple[int, str]]:
+    """Map roles (red, nir, ...) to (1-based band index, declared name)."""
+    names = list(ds.descriptions or [])
+    tag = ds.tags().get("bands")
+    if tag:
+        names = [n.strip() for n in tag.split(",")]
+    found: dict[str, tuple[int, str]] = {}
+    for idx, name in enumerate(names, start=1):
+        if not name:
+            continue
+        for role, aliases in _BAND_ROLES.items():
+            if name.upper() in aliases and role not in found:
+                found[role] = (idx, name)
+    return found
+
+
+def _choose_index(query: str, bands: dict[str, tuple[int, str]]) -> dict[str, Any]:
+    wants_water = any(w in query.lower() for w in ("water", "flood", "reservoir", "lake", "river", "mndwi", "ndwi"))
+    declared = ", ".join(sorted(bands)) or "none declared"
+    if wants_water:
+        if "green" in bands and "swir" in bands:
+            return {"fn": compute_mndwi, "bands": ["green", "swir"],
+                    "threshold": 0.0, "target": "water"}
+        if "green" in bands and "nir" in bands:
+            return {"fn": compute_ndwi, "bands": ["green", "nir"],
+                    "threshold": 0.0, "target": "water"}
+        raise ValueError(
+            f"A water index needs green plus NIR or SWIR bands; this scene declares: {declared}."
+        )
+    if "red" in bands and "nir" in bands:
+        return {"fn": compute_ndvi, "bands": ["red", "nir"],
+                "threshold": 0.4, "target": "dense vegetation"}
+    raise ValueError(f"NDVI needs red and NIR bands; this scene declares: {declared}.")
+
+
+def _downsample_mask(mask: np.ndarray, max_side: int) -> tuple[np.ndarray, tuple[int, int]]:
+    """Block-majority downsample so vectorising stays fast; returns the (x, y) factor."""
+    h, w = mask.shape
+    fy, fx = max(1, -(-h // max_side)), max(1, -(-w // max_side))
+    if fx == 1 and fy == 1:
+        return mask, (1, 1)
+    hh, ww = (h // fy) * fy, (w // fx) * fx
+    blocks = mask[:hh, :ww].reshape(hh // fy, fy, ww // fx, fx)
+    return blocks.mean(axis=(1, 3)) >= 0.5, (fx, fy)
+
+
+def _mask_pixel_area_m2(
+    artifact_repo: ArtifactRepository, image_id: str, mask_shape: tuple[int, int]
+) -> float | None:
+    """Ground area (m²) covered by one pixel of a mask that spans the whole scene.
+
+    Masks are computed on quick-looks, so one mask pixel covers
+    (scene width / mask width) × (scene height / mask height) scene pixels.
+    """
+    try:
+        tif = _load_tif_bytes(artifact_repo, image_id)
+        with rasterio.MemoryFile(tif) as mem:
+            with mem.open() as ds:
+                if not (ds.crs and ds.transform):
+                    return None
+                one_scene_pixel = change_area_m2(np.ones((1, 1), dtype=bool), ds.transform, ds.crs)
+                width, height = ds.width, ds.height
+    except (FileNotFoundError, rasterio.errors.RasterioIOError):
+        return None
+    mask_h, mask_w = mask_shape
+    return one_scene_pixel * (width / mask_w) * (height / mask_h)
+
+
+MAX_REGIONS = 9
+
+
+def mask_to_regions(mask: np.ndarray, pixel_area_m2: float | None) -> list[dict[str, Any]]:
+    """Vectorise a binary mask into outline polygons, largest first.
+
+    Coordinates are normalised to [0, 1] of the scene (x right, y down) so they overlay any
+    rendering of it. Areas come from pixel counts × pixel ground area, never from a model.
+    """
+    from rasterio.features import shapes
+    from shapely.geometry import shape
+
+    h, w = mask.shape
+    polygons = []
+    for geom, value in shapes(mask.astype(np.uint8), mask=mask.astype(bool)):
+        if value != 1:
+            continue
+        poly = shape(geom)
+        polygons.append((poly.area, poly))
+    polygons.sort(key=lambda p: -p[0])
+
+    regions = []
+    for index, (pixel_count, poly) in enumerate(polygons[:MAX_REGIONS], start=1):
+        simplified = poly.simplify(0.5, preserve_topology=True)
+        rings = [simplified.exterior, *simplified.interiors]
+        minx, miny, maxx, maxy = poly.bounds
+        regions.append({
+            "id": index,
+            "rings": [[[round(x / w, 5), round(y / h, 5)] for x, y in ring.coords] for ring in rings],
+            "bbox": [round(minx / w, 5), round(miny / h, 5), round(maxx / w, 5), round(maxy / h, 5)],
+            "pixel_count": int(round(pixel_count)),
+            "area_m2": round(pixel_count * pixel_area_m2, 2) if pixel_area_m2 is not None else None,
+        })
+    return regions
 
 
 def _get_model_adapter(model_mode: str):
@@ -133,28 +245,38 @@ def dispatch_tool(
             raise ValueError("spectral_index: no image_ids in inputs")
 
         tif = _load_tif_bytes(artifact_repo, image_id_a)
-
         with rasterio.MemoryFile(tif) as mem:
             with mem.open() as ds:
-                band_count = ds.count
-                # Use first 3 bands as R/G/B proxy; adapt for real Sentinel-2 later
-                b1 = ds.read(1).astype(float)
-                b2 = ds.read(min(2, band_count)).astype(float)
-                b3 = ds.read(min(3, band_count)).astype(float)
+                bands = _named_bands(ds)
+                transform, crs = ds.transform, ds.crs
+                read = lambda role: ds.read(bands[role][0]).astype(float)  # noqa: E731
+                spec = _choose_index(inputs.get("query", ""), bands)
+                result = spec["fn"](*(read(b) for b in spec["bands"]))
 
-        # Compute MNDWI as default (green / SWIR proxy with available bands)
-        result = compute_mndwi(b2, b3)  # band2=green proxy, band3=SWIR proxy
-        index_name = result["name"]
+        index = result["array"]
+        artifact_repo.artifact_path(job_id, "index_mask.png").write_bytes(_index_to_png(index))
 
-        mask_png = _index_to_png(result["array"])
-        mask_path = artifact_repo.artifact_path(job_id, "index_mask.png")
-        mask_path.write_bytes(mask_png)
+        # Deterministic threshold rule → outline evidence; the rule is recorded, not hidden.
+        target = np.nan_to_num(index, nan=-1.0) > spec["threshold"]
+        coarse, factor = _downsample_mask(target, 512)
+        one_px = (
+            change_area_m2(np.ones((1, 1), dtype=bool), transform, crs) if crs and transform else None
+        )
+        regions = mask_to_regions(coarse, one_px * factor[0] * factor[1] if one_px else None)
+        covered = int(np.count_nonzero(target))
 
         return {
-            "index_type": index_name,
+            "index_type": result["name"],
+            "bands_used": {r: f"band {bands[r][0]} ({bands[r][1]})" for r in spec["bands"]},
             "index_mean": round(result["mean"], 4),
             "index_min": round(result["min"], 4),
             "index_max": round(result["max"], 4),
+            "rule": f"{result['name']} > {spec['threshold']:g} → {spec['target']}",
+            "target": spec["target"],
+            "target_pixels": covered,
+            "target_fraction": round(covered / target.size, 4),
+            "target_area_m2": round(covered * one_px, 2) if one_px else None,
+            "index_regions": regions,
             "mask_url": f"/api/jobs/{job_id}/artifacts/index_mask.png",
         }
 
@@ -171,6 +293,7 @@ def dispatch_tool(
         return {
             "vqa_answer": result.text,
             "confidence": result.confidence,
+            "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
         }
 
@@ -186,6 +309,7 @@ def dispatch_tool(
         return {
             "caption": result.text,
             "confidence": result.confidence,
+            "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
         }
 
@@ -252,8 +376,12 @@ def dispatch_tool(
         if not image_id_b:
             raise ValueError("changeformer: requires two image_ids for bi-temporal analysis")
 
-        from app.models.changeformer import ChangeFormerAdapter
-        adapter = ChangeFormerAdapter()
+        if model_mode == "mock":
+            from app.models.mock import MockModelAdapter
+            adapter = MockModelAdapter()
+        else:
+            from app.models.changeformer import ChangeFormerAdapter
+            adapter = ChangeFormerAdapter(mode=model_mode)
         band_map = inputs.get("band_map", "B1/B2/B3")
 
         preview_a = artifact_repo.artifact_path(job_id, "preview.png")
@@ -276,7 +404,16 @@ def dispatch_tool(
         # Persist raw mask as numpy for change_area node
         np.save(str(artifact_repo.artifact_path(job_id, "change_mask.npy")), change_mask.mask)
 
+        pixel_area_m2 = None
+        if image_id_a:
+            pixel_area_m2 = _mask_pixel_area_m2(artifact_repo, image_id_a, change_mask.mask.shape)
+        regions = mask_to_regions(change_mask.mask, pixel_area_m2)
+        artifact_repo.artifact_path(job_id, "change_regions.json").write_text(json.dumps(regions))
+
         return {
+            "change_regions": regions,
+            "confidence_source": change_mask.confidence_source,
+            "model_mode": "mock" if model_mode == "mock" else adapter.model_mode,
             "changed_pixels": int(np.count_nonzero(change_mask.mask)),
             "total_pixels": int(change_mask.mask.size),
             "change_ratio": round(float(np.count_nonzero(change_mask.mask)) / change_mask.mask.size, 4),
@@ -295,19 +432,17 @@ def dispatch_tool(
 
         # Try to get affine + CRS from image A
         area_m2 = None
+        pixel_area_m2 = None
         if image_id_a:
-            try:
-                tif = _load_tif_bytes(artifact_repo, image_id_a)
-                with rasterio.MemoryFile(tif) as mem:
-                    with mem.open() as ds:
-                        if ds.crs and ds.transform:
-                            area_m2 = change_area_m2(mask, ds.transform, ds.crs)
-            except Exception:
-                pass
+            pixel_area_m2 = _mask_pixel_area_m2(artifact_repo, image_id_a, mask.shape)
+            if pixel_area_m2 is not None:
+                area_m2 = round(int(np.count_nonzero(mask)) * pixel_area_m2, 2)
 
         return {
             "change_area_m2": area_m2,
             "changed_pixels": int(np.count_nonzero(mask)),
+            "mask_pixel_area_m2": pixel_area_m2,
+            "area_method": "changed mask pixels × ground area of one mask pixel (from the GeoTIFF transform)",
         }
 
     # ------------------------------------------------------------------
@@ -325,15 +460,20 @@ def dispatch_tool(
         change_ratio = inputs.get("change_ratio", 0)
         change_area = inputs.get("change_area_m2")
 
-        summary = result.text
+        # Numbers come from the mask, never from the language model; keep them separate so
+        # the UI can label which sentences are measured and which are model text.
+        measured = []
         if change_area:
-            summary += f" Estimated changed area: {change_area:,.0f} m²."
+            measured.append(f"Estimated changed area: {change_area:,.0f} m².")
         if change_ratio:
-            summary += f" Change ratio: {change_ratio * 100:.1f}% of scene."
+            measured.append(f"Change ratio: {change_ratio * 100:.1f}% of scene.")
 
         return {
-            "change_description": summary,
+            "change_description": result.text,
+            "measured_summary": " ".join(measured) or None,
+            "vlm_input": "T1 quick-look only (the VLM takes one image)",
             "confidence": result.confidence,
+            "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
         }
 
@@ -357,40 +497,29 @@ def dispatch_tool(
         }
 
     # ------------------------------------------------------------------
-    elif tool_name == "sar_calibrate":
-        # Simulate SAR calibration by returning the preview as calibrated SAR for the MVP pipeline
-        return {"status": "ok", "calibration_factor": 1.0, "incidence_angle": 30.0}
-
-    elif tool_name == "sar_despeckle":
-        # Simulate despeckling
-        return {"status": "ok", "window_size": 5, "noise_var": 0.05}
-
-    elif tool_name == "cross_modal_fusion":
-        from app.tools.fusion import cross_modal_fusion
-        preview_a = artifact_repo.artifact_path(job_id, "preview.png")
-        preview_b = artifact_repo.artifact_path(job_id, "preview_b.png")
-        if not preview_a.exists() or not preview_b.exists():
-            raise RuntimeError("cross_modal_fusion requires both preview.png and preview_b.png")
-
-        png_a = preview_a.read_bytes()
-        png_b = preview_b.read_bytes()
-
-        fused_png, analysis = cross_modal_fusion(png_a, png_b)
-        fusion_path = artifact_repo.artifact_path(job_id, "fused_preview.png")
-        fusion_path.write_bytes(fused_png)
-
-        # Overwrite preview.png so geochat_vqa uses the fused image!
-        # This is a cool trick to let the single-image VLM answer queries about the fused result.
-        preview_a.write_bytes(fused_png)
-
+    elif tool_name in ("sar_calibrate", "sar_despeckle"):
+        # app.tools.sar implements these, but calibration constants must come from product
+        # metadata the ingest path doesn't carry yet — so nothing is computed here, and the
+        # trace says so instead of reporting invented parameters.
         return {
-            "fusion_method": analysis["fusion_method"],
-            "fusion_description": analysis["description"],
-            "fused_url": f"/api/jobs/{job_id}/artifacts/fused_preview.png"
+            "simulated": True,
+            "note": f"{tool_name} is not wired to product calibration metadata yet; no computation ran.",
         }
 
-    elif tool_name in ("compatibility", "geochat_summary", "mndwi"):
-        return {"status": "ok", "tool": tool_name}
+    elif tool_name == "compatibility":
+        if not (image_id_a and image_id_b):
+            raise ValueError("compatibility: requires two image_ids")
+        from app.ingestion.compatibility import check_compatibility
+        report = check_compatibility(
+            _load_tif_bytes(artifact_repo, image_id_a), _load_tif_bytes(artifact_repo, image_id_b)
+        )
+        if not report.compatible:
+            raise ValueError(report.rejection_reason)
+        return {"compatible": True}
+
+    elif tool_name in ("geochat_summary", "mndwi"):
+        return {"simulated": True, "note": f"{tool_name} is a placeholder step; no computation ran."}
+
 
     # ------------------------------------------------------------------
     else:

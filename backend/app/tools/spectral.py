@@ -20,6 +20,12 @@ def compute_ndvi(red: NDArray, nir: NDArray) -> dict:
     return _stats(index, name="NDVI")
 
 
+def compute_ndwi(green: NDArray, nir: NDArray) -> dict:
+    """McFeeters Normalised Difference Water Index: (Green - NIR) / (Green + NIR)."""
+    index = _safe_ratio(green, nir)
+    return _stats(index, name="NDWI")
+
+
 def compute_mndwi(green: NDArray, swir: NDArray) -> dict:
     """Modified Normalised Difference Water Index: (Green - SWIR) / (Green + SWIR)."""
     index = _safe_ratio(green, swir)
