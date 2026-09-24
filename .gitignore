@@ -14,6 +14,8 @@ frontend/out/
 # Runtime data and artifacts
 **/data/uploads/
 **/data/artifacts/
+**/data/previews/
+**/data/samples/
 *.db
 *.sqlite*
 model-cache/
@@ -34,3 +36,4 @@ checkpoints/
 .DS_Store
 .idea/
 .vscode/
+*.tsbuildinfo
