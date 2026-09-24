@@ -53,10 +53,11 @@ No credentials required for Phase 0–1.
 
 **Status:** Open. The redesigned UI renders honest fallbacks for each of these; none is faked.
 
-- **Streaming (§8):** the UI polls `GET /api/jobs/{id}/trace`, which the executor rewrites after
-  every step, instead of the AI SDK UI Message Stream over SSE. Every row is still a recorded
-  backend state change, but granularity is per step (no `data-progress` tile counts, no
-  cold-start event: the UI only says the GPU worker *may* be starting after 15 s on a VLM step).
+- **Streaming (§8, resolved 2026-09-24):** questions go through `useChat` + `DefaultChatTransport`
+  to `POST /api/chat`, which emits the UI Message Stream protocol (v1): `data-job`, `data-trace`
+  (reconciled by job id), dynamic `tool-*` parts per step, the answer as `text-*`, `finish`, `[DONE]`.
+  No reasoning parts. If the stream drops, trace polling resumes the job from the backend record.
+  Granularity is per step: there are still no tile-level `data-progress` counts or cold-start events.
 - **Stop (§8.5):** `POST /api/jobs/{id}/cancel` stops the run *before the next step*; a step that
   is already running (e.g. a Modal GPU call) finishes first. The UI labels Stop that way.
 - **SAR steps (resolved 2026-09-24):** `sar_calibrate` checks the file's metadata and skips calibration
@@ -65,8 +66,10 @@ No credentials required for Phase 0–1.
   `sar_despeckle` runs the Lee filter; `sar_water` outlines VV < −18 dB. The router is v1.1.0.
 - **Water change (2026-09-24):** `index_change` outlines water gained / lost by differencing MNDWI
   (or NDWI) between T1 and T2 — a deterministic rule, labelled as such, that runs before ChangeFormer.
-- **ChangeFormer:** no weights are loaded, so change detection only works in mock mode (fixed
-  placeholder mask, labelled as such). In `modal` mode the step fails with a plain message.
+- **ChangeFormer (resolved 2026-09-24):** ChangeFormer V6 with the public DSIFN-CD weights (MIT,
+  `scripts/fetch_changeformer.py`) runs locally on CPU (~5 s per pair). It was trained on 2 m imagery:
+  on 10 m Sentinel-2 it flags land-cover patches but misses the reservoir refill, which the
+  `index_change` rule catches. The UI labels its outlines with the training data.
 - **Persistence:** analyses are restored from the backend's own traces, keyed by ids kept in the
   browser (`localStorage`), not an SQLite analyses table.
 - **Pixel values under the cursor / σ⁰ readout:** not available — the browser only has the 512 px

@@ -59,12 +59,15 @@ export function deriveEvidence(trace: OrchestratorTrace | null): Evidence[] {
   if (change) {
     const isMock = change.step.outputs.model_mode === "mock" || mode === "mock";
     const conf = confidenceView(change.step.outputs.confidence, change.step.outputs.confidence_source, isMock);
+    const trainedOn = str(change.step.outputs.training_note);
     for (const r of (change.step.outputs.change_regions as RegionOut[] | undefined) ?? []) {
       out.push({
         kind: "contour",
         tone: "change",
-        title: "Changed region",
-        honesty: isMock ? "Change mask outline (mock model — placeholder mask)" : "Change mask outline",
+        title: "Changed region (model)",
+        honesty: isMock
+          ? "Change mask outline (mock model — placeholder mask)"
+          : `ChangeFormer mask outline${trainedOn ? ` — trained on ${trainedOn.split(",")[0].replace(/\(.*$/, "").trim()}, 2 m imagery` : ""}`,
         bbox: r.bbox,
         rings: r.rings,
         areaM2: r.area_m2,

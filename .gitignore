@@ -16,6 +16,7 @@ frontend/out/
 **/data/artifacts/
 **/data/previews/
 **/data/samples/
+**/data/models/
 *.db
 *.sqlite*
 model-cache/

@@ -31,14 +31,14 @@ def test_geochat_ground_raises_model_unavailable():
         adapter.ground(FAKE_PNG, "vehicle", band_map=BAND_MAP)
 
 
-def test_changeformer_raises_model_unavailable():
-    adapter = ChangeFormerAdapter(mode="local")
+def test_changeformer_raises_model_unavailable(tmp_path):
+    adapter = ChangeFormerAdapter(mode="local", weights_dir=tmp_path)
     with pytest.raises(ModelUnavailableError, match="ChangeFormer"):
         adapter.detect_change(FAKE_PNG, FAKE_PNG, band_map=BAND_MAP)
 
 
-def test_changeformer_modal_raises_model_unavailable():
-    adapter = ChangeFormerAdapter(mode="modal")
+def test_changeformer_modal_raises_model_unavailable(tmp_path):
+    adapter = ChangeFormerAdapter(mode="modal", weights_dir=tmp_path)
     with pytest.raises(ModelUnavailableError):
         adapter.detect_change(FAKE_PNG, FAKE_PNG, band_map=BAND_MAP)
 
@@ -54,3 +54,27 @@ def test_geochat_modal_worker_failure_raises_model_unavailable():
     adapter._cls = Unreachable()
     with pytest.raises(ModelUnavailableError, match="GeoChat Modal worker unavailable"):
         adapter.ground(FAKE_PNG, "pastures", band_map=BAND_MAP)
+
+
+def test_changeformer_runs_on_real_weights_when_present():
+    """Real inference path (skipped on machines without scripts/fetch_changeformer.py weights)."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    from app.models.changeformer import WEIGHTS_FILE, default_weights_dir
+
+    if not (default_weights_dir() / WEIGHTS_FILE).exists():
+        pytest.skip("ChangeFormer weights not fetched")
+
+    def png(color):
+        buf = io.BytesIO()
+        Image.new("RGB", (300, 200), color).save(buf, format="PNG")
+        return buf.getvalue()
+
+    result = ChangeFormerAdapter().detect_change(png((40, 90, 40)), png((40, 90, 40)), band_map=BAND_MAP)
+    assert result.mask.shape == (200, 300)  # padded to 256-px tiles internally, cropped back
+    assert result.mask.dtype == bool
+    assert result.confidence_source == "model-provided"
+    assert 0.0 <= result.confidence <= 1.0

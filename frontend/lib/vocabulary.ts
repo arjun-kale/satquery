@@ -75,7 +75,7 @@ export function modelName(tool: string, mode: ModelMode | null, weights?: unknow
   const kind = TOOL[tool]?.model;
   if (!kind) return null;
   if (mode === "mock") return "mock adapter";
-  if (kind === "change") return "ChangeFormer";
+  if (kind === "change") return typeof weights === "string" && /dsifn/i.test(weights) ? "ChangeFormer V6 · DSIFN weights · CPU" : "ChangeFormer";
   if (typeof weights !== "string") return "SatQuery VLM";
   if (/m2-lora/i.test(weights)) return "SatQuery VLM · M2 adapter";
   return "SatQuery VLM · base weights";

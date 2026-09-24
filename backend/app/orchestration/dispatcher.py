@@ -470,8 +470,9 @@ def dispatch_tool(
             from app.models.mock import MockModelAdapter
             adapter = MockModelAdapter()
         else:
+            # ChangeFormer runs locally on CPU in every non-mock mode (small model, no GPU needed).
             from app.models.changeformer import ChangeFormerAdapter
-            adapter = ChangeFormerAdapter(mode=model_mode)
+            adapter = ChangeFormerAdapter()
         band_map = inputs.get("band_map", "B1/B2/B3")
 
         preview_a = artifact_repo.artifact_path(job_id, "preview.png")
@@ -502,6 +503,9 @@ def dispatch_tool(
 
         return {
             "change_regions": regions,
+            "weights": getattr(adapter, "weights", None),
+            "training_note": (adapter.manifest.get("trained_on") if hasattr(adapter, "manifest") else None),
+            "confidence_method": "mean softmax P(change) over pixels predicted as changed",
             "confidence_source": change_mask.confidence_source,
             "model_mode": "mock" if model_mode == "mock" else adapter.model_mode,
             "changed_pixels": int(np.count_nonzero(change_mask.mask)),
