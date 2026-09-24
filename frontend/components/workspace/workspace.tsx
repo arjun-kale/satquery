@@ -11,6 +11,7 @@ import { PROMPT_ID } from "@/components/conversation/prompt-box";
 import { TraceDrawer } from "@/components/trace/trace-drawer";
 import { EvidenceViewer } from "@/components/viewer/evidence-viewer";
 import { useActions, useHealth, usePersistence, useTracePolling } from "./effects";
+import { useStreamingAnalysis } from "./stream";
 import { EmptyState } from "./empty-state";
 import { SceneComposer } from "./scene-composer";
 import { SceneRail } from "./scene-rail";
@@ -36,7 +37,8 @@ function Shell() {
   useTracePolling();
   const state = useWorkspace();
   const dispatch = useDispatch();
-  const actions = useActions();
+  const jobActions = useActions();
+  const actions = useStreamingAnalysis(jobActions);
   const set = activeSceneSet(state);
   const report = useReport();
   useHotkeys(actions.stop);

@@ -172,7 +172,7 @@ export function useTracePolling() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    const pending = analyses.filter((a) => a.jobId && !TERMINAL_STATUSES.includes(a.status as never));
+    const pending = analyses.filter((a) => a.jobId && !a.streaming && !TERMINAL_STATUSES.includes(a.status as never));
     if (!pending.length) return;
     let cancelled = false;
     const lost = pending.some((a) => a.connection === "lost");

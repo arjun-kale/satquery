@@ -45,6 +45,8 @@ export interface Analysis {
   submitError: string | null;
   connection: "ok" | "lost";
   stopRequested: boolean;
+  /** Receiving live events over the AI SDK stream; polling skips it until the stream ends. */
+  streaming?: boolean;
 }
 
 export type ViewerMode = "swipe" | "side" | "flicker" | "blend";
@@ -95,6 +97,7 @@ export type Action =
   | { type: "analysis/trace"; localId: string; response: TraceResponse }
   | { type: "analysis/connection"; localId: string; connection: "ok" | "lost" }
   | { type: "analysis/stopRequested"; localId: string }
+  | { type: "analysis/streaming"; localId: string; value: boolean }
   | { type: "analysis/activate"; localId: string }
   | { type: "evidence/focus"; n: number | null }
   | { type: "evidence/hover"; n: number | null }
@@ -184,6 +187,8 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       }));
     case "analysis/connection":
       return patchAnalysis(state, action.localId, () => ({ connection: action.connection }));
+    case "analysis/streaming":
+      return patchAnalysis(state, action.localId, () => ({ streaming: action.value }));
     case "analysis/stopRequested":
       return patchAnalysis(state, action.localId, () => ({ stopRequested: true }));
     case "analysis/activate":
