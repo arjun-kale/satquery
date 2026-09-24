@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query
+import json
+
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse
 
-from app.ingestion.preview import render_preview
+from app.ingestion.preview import render_preview, render_window, stretch_params
 from app.ingestion.raster import ingest_raster, RasterIngestError
 from app.schemas import IngestResponse, RasterMetadata
 from app.storage.artifacts import ArtifactRepository
@@ -86,3 +88,30 @@ def get_image_preview(image_id: str, request: Request) -> FileResponse:
             raise HTTPException(404, detail=f"Image {image_id!r} not found.")
         cached.write_bytes(png)
     return FileResponse(cached, media_type="image/png")
+
+
+_WINDOW_MAX = 256
+
+
+@router.get("/images/{image_id}/window.png")
+def get_image_window(
+    image_id: str,
+    request: Request,
+    col0: int = Query(..., description="Left column of the window, in native scene pixels."),
+    row0: int = Query(..., description="Top row of the window, in native scene pixels."),
+    size: int = Query(64, ge=8, le=_WINDOW_MAX),
+) -> Response:
+    """Native-resolution pixels (no resampling) for the loupe, stretched exactly like the preview."""
+    artifact_repo: ArtifactRepository = request.app.state.artifact_repository
+    try:
+        raw = artifact_repo.find_upload(image_id).read_bytes()
+    except FileNotFoundError:
+        raise HTTPException(404, detail=f"Image {image_id!r} not found.")
+    cache = artifact_repo.preview_path(image_id).with_suffix(".stretch.json")
+    if cache.exists():
+        params = json.loads(cache.read_text())
+    else:
+        params = stretch_params(raw)
+        cache.write_text(json.dumps(params))
+    png = render_window(raw, col0, row0, size, params)
+    return Response(png, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})

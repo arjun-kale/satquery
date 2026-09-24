@@ -33,6 +33,11 @@ export function previewUrl(imageId: string): string {
   return `${API_BASE}/api/images/${imageId}/preview.png`;
 }
 
+/** Native-resolution pixels of the original raster (no resampling), stretched like the preview. */
+export function windowUrl(imageId: string, col0: number, row0: number, size: number): string {
+  return `${API_BASE}/api/images/${imageId}/window.png?col0=${col0}&row0=${row0}&size=${size}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {

@@ -82,3 +82,19 @@ def test_disjoint_pair_fails_overlap(tmp_path):
 def test_cancel_unknown_job_is_404(tmp_path):
     with _client(tmp_path) as client:
         assert client.post("/api/jobs/nope/cancel").status_code == 404
+
+
+def test_native_window_is_unresampled_and_transparent_outside(tmp_path):
+    from PIL import Image as PILImage
+
+    with _client(tmp_path) as client:
+        image_id = _upload(client, _tif())
+        inside = client.get(f"/api/images/{image_id}/window.png", params={"col0": 0, "row0": 0, "size": 16})
+        assert inside.status_code == 200
+        img = PILImage.open(io.BytesIO(inside.content))
+        assert img.size == (16, 16)  # native pixels: no resampling to the preview size
+        assert img.getpixel((0, 0))[3] == 255
+        edge = client.get(f"/api/images/{image_id}/window.png", params={"col0": 24, "row0": 24, "size": 16})
+        img = PILImage.open(io.BytesIO(edge.content))
+        assert img.getpixel((15, 15))[3] == 0  # pixel (39, 39) is outside the 32×32 scene
+        assert img.getpixel((0, 0))[3] == 255

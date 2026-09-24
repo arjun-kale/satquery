@@ -4,7 +4,7 @@ import { Popover } from "@base-ui/react/popover";
 import { Columns2, Layers, Maximize, Pause, Play, Search, SplitSquareHorizontal, Blend as BlendIcon, Repeat, ScanEye } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveEvidence, deriveJobLayers, deriveTimeline, isActivePhase, runPhase } from "@/lib/analysis";
-import { previewUrl, assetUrl } from "@/lib/api";
+import { previewUrl, assetUrl, windowUrl } from "@/lib/api";
 import { formatDate, formatLonLat, pixelToLonLat, scaleBar } from "@/lib/geo";
 import { cn, isTypingTarget, prefersReducedMotion } from "@/lib/utils";
 import { ROLE } from "@/lib/vocabulary";
@@ -24,7 +24,7 @@ import { useElementSize, useNavigation, useView, type Size, type View } from "./
 
 const FLICKER_MS = 600;
 const QUICKLOOK_PX = 512; // backend preview size (app/ingestion/preview.py)
-const LOUPE = { size: 168, scale: 6 };
+const LOUPE = { size: 168 };
 
 interface Cursor {
   u: number;
@@ -374,18 +374,39 @@ function SceneLabels({ mode, scenes, pane, flickerShowB, sarOpacity }: { mode: V
 
 /* ------------------------------------------------------------------ Loupe */
 
+/*
+ * The loupe shows the original raster's native pixels (fetched as a small window, stretched like
+ * the preview), so a Verifier checks a box edge against real pixels, not the 512 px quick-look.
+ * Windows snap to a 16 px grid so moving the cursor reuses cached tiles; until the native window
+ * arrives the preview is shown underneath and labelled as preview resolution.
+ */
+const NATIVE = { size: 64, grid: 16, scale: 4 };
+
 function Loupe({ scene, cursor, area }: { scene: Scene; cursor: Cursor; area: Size }) {
   const S = LOUPE.size;
-  const bg = QUICKLOOK_PX * LOUPE.scale;
+  const m = scene.metadata;
+  const col = Math.min(m.width - 1, Math.floor(cursor.u * m.width));
+  const row = Math.min(m.height - 1, Math.floor(cursor.v * m.height));
+  const col0 = Math.round(col / NATIVE.grid) * NATIVE.grid - NATIVE.size / 2;
+  const row0 = Math.round(row / NATIVE.grid) * NATIVE.grid - NATIVE.size / 2;
+  const url = windowUrl(scene.imageId, col0, row0, NATIVE.size);
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const native = loaded === url;
+
+  // Preview fallback: the quick-look magnified to the same ground scale as the native view.
+  const previewPx = (m.width / QUICKLOOK_PX) * NATIVE.scale; // screen px per quick-look px
+  const bgW = QUICKLOOK_PX * previewPx;
+  const bgH = QUICKLOOK_PX * (m.height / QUICKLOOK_PX) * NATIVE.scale;
+
   const left = cursor.ax + 24 + S > area.w ? cursor.ax - 24 - S : cursor.ax + 24;
   const top = Math.min(Math.max(8, cursor.ay - S / 2), area.h - S - 28);
+  const gsd = m.gsd_m ? `1 px = ${m.gsd_m} m` : null;
   return (
     <div className="pointer-events-none absolute z-20 flex flex-col items-center gap-1" style={{ left, top }}>
       <div
         className="relative overflow-hidden rounded-full border-2 border-evidence bg-base shadow-[0_0_0_1px_#000,0_10px_30px_rgb(0_0_0/0.6)]"
         style={{ width: S, height: S }}
       >
-        {/* An <img> (not a CSS background) so every backend image request is CORS-mode and cache-compatible. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={previewUrl(scene.imageId)}
@@ -393,18 +414,34 @@ function Loupe({ scene, cursor, area }: { scene: Scene; cursor: Cursor; area: Si
           crossOrigin="anonymous"
           draggable={false}
           className="absolute max-w-none"
+          style={{ width: bgW, height: bgH, left: S / 2 - cursor.u * bgW, top: S / 2 - cursor.v * bgH, imageRendering: "pixelated" }}
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={url}
+          src={url}
+          alt=""
+          crossOrigin="anonymous"
+          draggable={false}
+          onLoad={() => setLoaded(url)}
+          className="absolute max-w-none"
           style={{
-            width: bg,
-            height: bg,
-            left: -(cursor.u * bg - S / 2),
-            top: -(cursor.v * bg - S / 2),
+            width: NATIVE.size * NATIVE.scale,
+            height: NATIVE.size * NATIVE.scale,
+            left: S / 2 - (col - col0 + 0.5) * NATIVE.scale,
+            top: S / 2 - (row - row0 + 0.5) * NATIVE.scale,
             imageRendering: "pixelated",
+            opacity: native ? 1 : 0,
           }}
         />
-        <span className="absolute top-1/2 left-1/2 size-3 -translate-1/2 border border-evidence shadow-[0_0_0_1px_#000]" />
+        <span
+          className="absolute top-1/2 left-1/2 -translate-1/2 border border-evidence shadow-[0_0_0_1px_#000]"
+          style={{ width: NATIVE.scale + 2, height: NATIVE.scale + 2 }}
+        />
       </div>
       <span className="rounded-sm bg-base/90 px-1.5 font-mono text-[11px] text-fg-muted">
-        {ROLE[scene.role].label} · quick-look pixels ×{LOUPE.scale}
+        {ROLE[scene.role].label} · {native ? `native pixels ×${NATIVE.scale}` : "preview resolution — loading native…"}
+        {native && gsd ? ` · ${gsd}` : ""}
       </span>
     </div>
   );
@@ -513,7 +550,7 @@ function ViewerToolbar({
             </Popover.Positioner>
           </Popover.Portal>
         </Popover.Root>
-        <IconButton label="Loupe — quick-look pixels under the cursor" shortcut="L" side="top" pressed={state.viewer.loupe} onClick={() => dispatch({ type: "viewer/loupe" })}>
+        <IconButton label="Loupe — native-resolution pixels under the cursor" shortcut="L" side="top" pressed={state.viewer.loupe} onClick={() => dispatch({ type: "viewer/loupe" })}>
           <Search />
         </IconButton>
         <IconButton label="Fit image" shortcut="0" side="top" onClick={onFit}>

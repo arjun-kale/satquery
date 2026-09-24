@@ -76,3 +76,56 @@ def _render_sar_db(linear: np.ndarray, size: tuple[int, int]) -> tuple[bytes, st
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue(), f"B1 dB [{lo:g}, {hi:g}]"
+
+
+def stretch_params(file_bytes: bytes, band_indices: tuple[int, int, int] = (1, 2, 3)) -> dict:
+    """The per-band 2-98 % limits of the whole scene (from a decimated read), so a native-resolution
+    window can be rendered with exactly the preview's stretch."""
+    with rasterio.MemoryFile(file_bytes) as memfile:
+        with memfile.open() as ds:
+            if (ds.tags().get("modality") or "").lower() == "sar":
+                return {"mode": "sar_db", "range": list(SAR_DB_RANGE)}
+            safe = [min(b, ds.count) for b in band_indices]
+            f = max(1, max(ds.width, ds.height) // 2048)
+            out_shape = (len(safe), ds.height // f, ds.width // f)
+            arr = ds.read(safe, out_shape=out_shape).astype(float)
+    limits = [[float(np.nanpercentile(b, 2)), float(np.nanpercentile(b, 98))] for b in arr]
+    return {"mode": "rgb", "bands": safe, "limits": limits}
+
+
+def render_window(file_bytes: bytes, col0: int, row0: int, size: int, params: dict) -> bytes:
+    """A size×size window of native pixels starting at (col0, row0), no resampling.
+
+    Pixels outside the scene are transparent.
+    """
+    from rasterio.windows import Window
+
+    win = Window(col0, row0, size, size)
+    with rasterio.MemoryFile(file_bytes) as memfile:
+        with memfile.open() as ds:
+            if params["mode"] == "sar_db":
+                band = ds.read(1, window=win, boundless=True, fill_value=0).astype(float)
+                inside = band > 0
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    db = 10.0 * np.log10(np.where(inside, band, np.nan))
+                lo, hi = params["range"]
+                grey = np.nan_to_num((np.clip(db, lo, hi) - lo) / (hi - lo) * 255, nan=0).astype(np.uint8)
+                rgb = np.stack([grey] * 3, axis=-1)
+            else:
+                arr = ds.read(params["bands"], window=win, boundless=True, masked=True).astype(float)
+                inside = ~np.ma.getmaskarray(arr).all(axis=0)
+                chans = []
+                for b, (lo, hi) in zip(arr.filled(np.nan), params["limits"]):
+                    chans.append(np.zeros_like(b, dtype=np.uint8) if hi == lo else
+                                 np.nan_to_num((np.clip(b, lo, hi) - lo) / (hi - lo) * 255, nan=0).astype(np.uint8))
+                rgb = np.stack(chans, axis=-1)
+            # Boundless reads mark outside pixels as masked/fill; also treat out-of-range indices as outside.
+            rows = np.arange(row0, row0 + size)[:, None]
+            cols = np.arange(col0, col0 + size)[None, :]
+            inside = inside & (rows >= 0) & (rows < ds.height) & (cols >= 0) & (cols < ds.width)
+
+    alpha = np.where(inside, 255, 0).astype(np.uint8)
+    img = Image.fromarray(np.dstack([rgb, alpha]), mode="RGBA")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
