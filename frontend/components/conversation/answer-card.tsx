@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, FileSearch, Info, RotateCcw, ScanEye, ImagePlus, Loader2, Check } from "lucide-react";
-import { CIRCLED, deriveAnswer, deriveEvidence, runPhase, type Evidence } from "@/lib/analysis";
+import { CIRCLED, deriveAnswer, deriveEvidence, runPhase, splitModelQuantities, type Evidence } from "@/lib/analysis";
 import { CONFIDENCE_METHOD } from "@/lib/confidence";
 import { formatArea } from "@/lib/geo";
 import { cn } from "@/lib/utils";
@@ -52,11 +52,11 @@ function AnswerCard({ analysis, set, isActive, onAsk, onReport, reportState }: P
       )}
 
       {answer.text ? (
-        <p className="text-lg leading-relaxed text-fg">{answer.text}</p>
+        <ModelText text={answer.text} fromModel={!!answer.tool && answer.tool !== "cross_modal_fusion"} />
       ) : (
         <p className="text-lg text-fg-muted">Unable to determine an answer from these images.</p>
       )}
-      {answer.note && <p className="-mt-1 text-xs text-fg-faint">Model input: {answer.note}</p>}
+      {answer.note && <p className="-mt-1 text-xs text-fg-faint">{answer.text ? `Model input: ${answer.note}` : answer.note}</p>}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <ConfidenceLine answer={answer} />
@@ -115,6 +115,35 @@ function AnswerCard({ analysis, set, isActive, onAsk, onReport, reportState }: P
             </button>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Model prose, with any quantities it states marked as the model's wording rather than measurements. */
+function ModelText({ text, fromModel }: { text: string; fromModel: boolean }) {
+  const segments = fromModel ? splitModelQuantities(text) : [{ text, quantity: false }];
+  const stated = segments.some((s) => s.quantity);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-lg leading-relaxed text-fg">
+        {segments.map((s, i) =>
+          s.quantity ? (
+            <Tip key={i} content="Stated by the model, not measured. Measured values are under “Measured from pixels”.">
+              <span tabIndex={0} className="cursor-help rounded-[2px] text-fg-muted underline decoration-warning decoration-dotted decoration-2 underline-offset-4">
+                {s.text}
+              </span>
+            </Tip>
+          ) : (
+            <span key={i}>{s.text}</span>
+          ),
+        )}
+      </p>
+      {stated && (
+        <p className="flex items-start gap-1.5 text-xs text-warning">
+          <Info className="mt-px size-3.5 shrink-0" />
+          Underlined numbers are the model&apos;s own wording, not measurements.
+        </p>
       )}
     </div>
   );

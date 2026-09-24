@@ -67,16 +67,22 @@ export function toolLabel(tool: string): string {
   return TOOL[tool]?.label ?? tool.replaceAll("_", " ");
 }
 
-/** The model that actually serves a tool in this backend mode — never a nicer-sounding one. */
-export function modelName(tool: string, mode: ModelMode | null): string | null {
+/**
+ * The model that served a tool, named by product ("SatQuery VLM"), with the weights that
+ * actually ran as reported by the worker — the M2 adapter is only credited where it was used.
+ */
+export function modelName(tool: string, mode: ModelMode | null, weights?: unknown): string | null {
   const kind = TOOL[tool]?.model;
   if (!kind) return null;
   if (mode === "mock") return "mock adapter";
-  return kind === "vlm" ? "GeoChat-7B · M2 LoRA" : "ChangeFormer";
+  if (kind === "change") return "ChangeFormer";
+  if (typeof weights !== "string") return "SatQuery VLM";
+  if (/m2-lora/i.test(weights)) return "SatQuery VLM · M2 adapter";
+  return "SatQuery VLM · base weights";
 }
 
 export const MODEL_MODE_LABEL: Record<ModelMode, string> = {
   mock: "Mock models",
   local: "Local models",
-  modal: "GeoChat on Modal GPU",
+  modal: "SatQuery VLM on GPU",
 };

@@ -4,7 +4,7 @@
  * the evidence geometry — the report adds no claims of its own.
  */
 
-import { CIRCLED, deriveAnswer, deriveEvidence, deriveTimeline, type Evidence } from "./analysis";
+import { CIRCLED, deriveAnswer, deriveEvidence, deriveTimeline, splitModelQuantities, type Evidence } from "./analysis";
 import { previewUrl } from "./api";
 import { CONFIDENCE_BANDS, CONFIDENCE_METHOD, DASH } from "./confidence";
 import { formatArea, formatDate, formatLonLat, formatSeconds, pixelToLonLat } from "./geo";
@@ -91,6 +91,11 @@ export async function buildReport(analysis: Analysis, set: SceneSet): Promise<Bl
   const conf = answer.confidence;
   const task = trace.canonical_template_id ? TASK[trace.canonical_template_id].label : "–";
   const generated = new Date().toISOString();
+  const segments = answer.text && answer.tool !== "cross_modal_fusion" ? splitModelQuantities(answer.text) : null;
+  const stated = segments?.some((s) => s.quantity);
+  const answerHtml = answer.text
+    ? `<p class="answer">${(segments ?? [{ text: answer.text, quantity: false }]).map((s) => (s.quantity ? `<span class="stated">${esc(s.text)}</span>` : esc(s.text))).join("")}</p>${stated ? `<p class="muted" style="font-size:12px">Dotted-underlined numbers are the model's own wording, not measurements; measured values are listed under “Measured from pixels”.</p>` : ""}`
+    : `<p class="answer">Unable to determine an answer from these images.</p>`;
 
   const evidenceRows = evidence
     .map((e) => {
@@ -123,6 +128,7 @@ export async function buildReport(analysis: Analysis, set: SceneSet): Promise<Bl
   h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:16px; margin:32px 0 10px; } .muted { color:var(--muted); }
   .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size:12px; font-variant-numeric: tabular-nums; }
   .answer { font-size:18px; line-height:1.6; margin: 8px 0; }
+  .stated { text-decoration: underline dotted #b45309 2px; text-underline-offset: 4px; color: var(--muted); }
   .warn { border:1px solid #fcd34d; background:#fffbeb; color:var(--warn); padding:8px 12px; border-radius:6px; }
   table { width:100%; border-collapse:collapse; font-size:13px; } th, td { text-align:left; vertical-align:top; padding:6px 8px; border-top:1px solid var(--line); }
   th { color:var(--muted); font-weight:500; font-size:12px; }
@@ -139,7 +145,7 @@ export async function buildReport(analysis: Analysis, set: SceneSet): Promise<Bl
 
   <h2>Answer</h2>
   ${answer.isMock ? `<p class="warn">Produced in mock mode: the answer text and any model boxes or masks are placeholders, not a reading of these images. Measured values are computed from the pixels.</p>` : ""}
-  <p class="answer">${esc(answer.text ?? "Unable to determine an answer from these images.")}</p>
+  ${answerHtml}
   <dl>
     <dt>Confidence</dt><dd>${esc(conf.available ? `${conf.band.word} (${conf.value.toFixed(2)})` : conf.reason)}</dd>
     <dt>Question type</dt><dd>${esc(task)} · ${esc(trace.routing_mode)} · similarity ${esc(trace.similarity_score?.toFixed(3) ?? "–")}</dd>

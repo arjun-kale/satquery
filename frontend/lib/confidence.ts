@@ -2,7 +2,7 @@
  * The single mapping from a confidence number to words (UX brief §F4). Shown verbatim in the
  * trace drawer so the Verifier can see exactly how "Likely" was decided.
  *
- * GeoChat's confidence is the geometric-mean probability of its generated tokens under greedy
+ * The VLM's confidence is the geometric-mean probability of its generated tokens under greedy
  * decoding (modal_worker/infer.py). It measures how sure the model was of its own wording, not
  * whether the answer is true — the UI says so wherever the number appears.
  */

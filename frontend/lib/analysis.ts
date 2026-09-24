@@ -16,6 +16,7 @@ import type {
 import { modelName, TOOL, toolLabel } from "./vocabulary";
 
 const MOCK_PREFIX = /^\s*\[MOCK\]\s*/;
+const BOX_ONLY = /^\s*(\{\s*<-?\d+>\s*<-?\d+>\s*<-?\d+>\s*<-?\d+>\s*(\|\s*<-?\d+>)?\s*\}\s*)+$/;
 
 function stepOf(trace: OrchestratorTrace | null, tool: string): { step: ExecutionStep; index: number } | null {
   if (!trace) return null;
@@ -149,6 +150,18 @@ export function deriveAnswer(trace: OrchestratorTrace | null): AnswerView {
     const raw = hit ? str(hit.step.outputs[key]) : null;
     if (hit && raw) {
       const isMock = hit.step.outputs.model_mode === "mock" || MOCK_PREFIX.test(raw);
+      // The model sometimes answers with only its location-token syntax, e.g. {<0><0><100><100>|<90>}.
+      // That is not an answer; never show raw tokens as prose.
+      if (BOX_ONLY.test(raw)) {
+        return {
+          text: null,
+          tool,
+          isMock,
+          confidence: { available: false, reason: "No text answer to rate" },
+          measured,
+          note: `The model replied with a location box (${raw.trim()}) instead of a sentence. Try rephrasing the question.`,
+        };
+      }
       return {
         text: raw.replace(MOCK_PREFIX, ""),
         tool,
@@ -331,7 +344,7 @@ export function deriveTimeline(trace: OrchestratorTrace | null, stopped: boolean
       key: `${i}-${tool}`,
       label: toolLabel(tool),
       tool,
-      model: modelName(tool, trace.model_mode),
+      model: modelName(tool, trace.model_mode, step?.outputs?.weights),
       detail: TOOL[tool]?.detail ?? null,
       status,
       ms: step?.latency_ms ?? null,
@@ -360,5 +373,30 @@ export function isActivePhase(phase: RunPhase): boolean {
 
 export function expertCount(trace: OrchestratorTrace | null, mode: ModelMode | null): number {
   if (!trace) return 0;
-  return new Set(trace.steps.map((s) => modelName(s.tool_name, mode)).filter(Boolean)).size;
+  return new Set(trace.steps.map((s) => modelName(s.tool_name, mode, s.outputs?.weights)).filter(Boolean)).size;
+}
+
+/* ------------------------------------------------------------------ model-stated quantities */
+
+/*
+ * Numbers with units inside model-generated text. The language model is never a source of
+ * measurements (UX brief §F4), so these are marked as the model's own wording; the measured
+ * values live in "Measured from pixels".
+ */
+const QUANTITY =
+  /(?:~\s*|≈\s*|about\s+|approximately\s+|around\s+|nearly\s+|over\s+|less than\s+)?\d[\d,]*(?:\.\d+)?\s*(?:%|percent\b|km²|km2\b|sq\.?\s?km\b|square\s+kilomet(?:er|re)s?\b|m²|m2\b|sqm\b|sq\.?\s?m\b|square\s+met(?:er|re)s?\b|hectares?\b|ha\b|acres?\b|kilomet(?:er|re)s?\b|km\b|met(?:er|re)s?\b)/gi;
+
+export type TextSegment = { text: string; quantity: boolean };
+
+export function splitModelQuantities(text: string): TextSegment[] {
+  const out: TextSegment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(QUANTITY)) {
+    const i = m.index ?? 0;
+    if (i > last) out.push({ text: text.slice(last, i), quantity: false });
+    out.push({ text: m[0], quantity: true });
+    last = i + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), quantity: false });
+  return out;
 }
