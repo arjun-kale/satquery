@@ -12,14 +12,17 @@ frontend/.next/
 frontend/out/
 
 # Runtime data and artifacts
-data/uploads/
-data/artifacts/
-data/*.db
-data/*.sqlite*
+**/data/uploads/
+**/data/artifacts/
 *.db
 *.sqlite*
 model-cache/
 checkpoints/
+
+# Datasets (live on the Modal volume; download locally with huggingface_hub)
+*.parquet
+*.lmdb/
+*.mdb
 
 # Secrets and local configuration
 .env
