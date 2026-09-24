@@ -1,0 +1,95 @@
+{
+  "adapter_sha256": "17f6c74fc5b80befd915d4ff5d75adf988689acf4d692dae081e02518245b0fd",
+  "decoding": "greedy",
+  "eval_manifest_hash": "5730aae829fa4285",
+  "evaluated_at": "2026-09-23T18:15:02+00:00",
+  "metrics": {
+    "binary": {
+      "accuracy": 0.73,
+      "by_category": {
+        "adjacency": {
+          "accuracy": 0.64,
+          "n": 25
+        },
+        "area": {
+          "accuracy": 0.72,
+          "n": 25
+        },
+        "count": {
+          "accuracy": 0.72,
+          "n": 25
+        },
+        "presence": {
+          "accuracy": 0.84,
+          "n": 25
+        }
+      },
+      "n": 100
+    },
+    "bounding box": {
+      "acc_at_0.5_iou": 0.56,
+      "by_category": {
+        "point": {
+          "accuracy": 0.8431372549019608,
+          "n": 51
+        },
+        "reference": {
+          "accuracy": 0.2653061224489796,
+          "n": 49
+        }
+      },
+      "mean_iou": 0.5009847290421788,
+      "n": 100,
+      "parse_rate": 1.0
+    },
+    "captioning": {
+      "bleu4": 0.28959885988804257,
+      "lulc_f1": 0.4939379509379508,
+      "n": 100,
+      "rouge_l": 0.49076319672968416
+    },
+    "mcq": {
+      "accuracy": 0.77,
+      "by_category": {
+        "adjacency": {
+          "accuracy": 0.46153846153846156,
+          "n": 13
+        },
+        "area": {
+          "accuracy": 0.46153846153846156,
+          "n": 13
+        },
+        "climate zone": {
+          "accuracy": 1.0,
+          "n": 13
+        },
+        "count": {
+          "accuracy": 0.8461538461538461,
+          "n": 13
+        },
+        "country": {
+          "accuracy": 1.0,
+          "n": 14
+        },
+        "presence": {
+          "accuracy": 0.7142857142857143,
+          "n": 14
+        },
+        "relative pos": {
+          "accuracy": 0.5,
+          "n": 6
+        },
+        "season": {
+          "accuracy": 1.0,
+          "n": 14
+        }
+      },
+      "n": 100
+    }
+  },
+  "mode": "scaled",
+  "n": 400,
+  "quantization": "4-bit NF4 (same as training)",
+  "seconds": 665.7,
+  "which": "adapted"
+}

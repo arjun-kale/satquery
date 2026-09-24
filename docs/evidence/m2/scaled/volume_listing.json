@@ -1,0 +1,146 @@
+[
+  {
+    "path": "checkpoints/m2_geochat/scaled/samples/samples.json",
+    "bytes": 2636
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/samples/S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_58_27.png",
+    "bytes": 381949
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/samples/S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_42_48.png",
+    "bytes": 309005
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/samples/S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_33_37.png",
+    "bytes": 316007
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/events.jsonl",
+    "bytes": 6107
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/results.json",
+    "bytes": 2839
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/eval/adapted_predictions.jsonl",
+    "bytes": 314482
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/eval/adapted_metrics.json",
+    "bytes": 2030
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/train_summary.json",
+    "bytes": 1216
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/final_manifest.json",
+    "bytes": 536
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/final/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/final/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/final/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/loss_history.json",
+    "bytes": 37087
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/training_args.bin",
+    "bytes": 5304
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/trainer_state.json",
+    "bytes": 32454
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/scheduler.pt",
+    "bytes": 1064
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/rng_state.pth",
+    "bytes": 14244
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/optimizer.pt",
+    "bytes": 640009682
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-200/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/training_args.bin",
+    "bytes": 5304
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/trainer_state.json",
+    "bytes": 30861
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/scheduler.pt",
+    "bytes": 1064
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/rng_state.pth",
+    "bytes": 14244
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/optimizer.pt",
+    "bytes": 640009682
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/checkpoint-190/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/runs.jsonl",
+    "bytes": 600
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/eval/base_predictions.jsonl",
+    "bytes": 293932
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/eval/base_metrics.json",
+    "bytes": 2001
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/data/train.parquet",
+    "bytes": 316018
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/data/split_stats.json",
+    "bytes": 2120
+  },
+  {
+    "path": "checkpoints/m2_geochat/scaled/data/eval.parquet",
+    "bytes": 58091
+  }
+]

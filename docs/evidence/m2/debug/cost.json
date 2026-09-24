@@ -1,0 +1,18 @@
+{
+  "status": "actual",
+  "detail": null,
+  "source": "modal billing report --json --show-resources -r h",
+  "app_ids": [
+    "ap-D6WsZUVgtwwBxcRXSJZj8h",
+    "ap-XI8eRa9qcCdVOInZxEQXPK",
+    "ap-lwxvJyDOG42jdSZVRs6axz"
+  ],
+  "by_resource_usd": {
+    "A10G": 0.4846,
+    "CPU": 0.0818,
+    "Memory": 0.0718
+  },
+  "total_usd": 0.6382,
+  "gpu_usd": 0.4846,
+  "gpu_hours_A10G": 0.441
+}

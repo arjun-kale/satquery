@@ -1,0 +1,130 @@
+[
+  {
+    "path": "checkpoints/m2_geochat/debug/results.json",
+    "bytes": 2920
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/events.jsonl",
+    "bytes": 3056
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/eval/adapted_predictions.jsonl",
+    "bytes": 30747
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/eval/adapted_metrics.json",
+    "bytes": 1895
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/train_summary.json",
+    "bytes": 1188
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/final_manifest.json",
+    "bytes": 535
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/final/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/final/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/final/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/loss_history.json",
+    "bytes": 2931
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/training_args.bin",
+    "bytes": 5304
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/trainer_state.json",
+    "bytes": 3261
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/scheduler.pt",
+    "bytes": 1064
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/rng_state.pth",
+    "bytes": 14244
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/optimizer.pt",
+    "bytes": 640009682
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-16/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/training_args.bin",
+    "bytes": 5304
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/trainer_state.json",
+    "bytes": 2627
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/scheduler.pt",
+    "bytes": 1064
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/rng_state.pth",
+    "bytes": 14244
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/optimizer.pt",
+    "bytes": 640009682
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/adapter_model.safetensors",
+    "bytes": 319882752
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/adapter_config.json",
+    "bytes": 835
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/checkpoint-12/README.md",
+    "bytes": 5105
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/runs.jsonl",
+    "bytes": 2084
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/eval/base_predictions.jsonl",
+    "bytes": 31520
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/eval/base_metrics.json",
+    "bytes": 1848
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/data/train.parquet",
+    "bytes": 26317
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/data/split_stats.json",
+    "bytes": 2061
+  },
+  {
+    "path": "checkpoints/m2_geochat/debug/data/eval.parquet",
+    "bytes": 17761
+  }
+]

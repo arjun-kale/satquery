@@ -1,0 +1,38 @@
+{
+  "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_33_37": [
+    {
+      "question": "[refer] Identify a continuous patch of <p>transitional woodlands or shrubs</p>.",
+      "reference_output": "[0.13 0.0, 0.47 0.16]",
+      "type": "bounding box"
+    },
+    {
+      "question": "Provide a description of this satellite image, including its geographic location, season, and land cover types.",
+      "reference_output": "This satellite image, captured during the summer in Lithuania, showcases a diverse landscape within the \"cold, no dry season, warm summer\" climate zone. The dominant feature is the expansive mixed forest, covering approximately 1,003,000 square meters and distributed across three areas, including a large section of 736,000 square meters, a smaller section of 260,000 square meters, and a marginal area. The mixed forest borders with land principally occupied by agriculture with significant areas of natural vegetation, which spans around 353,000 square meters and is fragmented into three sections, including two smaller areas of 180,000 and 167,000 square meters, and a marginal area. Additionally, the mixed forest is adjacent to pastures and transitional woodland or shrub, each covering less than 5% (72,000 sqm) of the total area. Furthermore, the land principally occupied by agriculture with significant areas of natural vegetation is adjacent to transitional woodland or shrub, and pastures are also next to transitional woodland or shrub, indicating a complex mosaic of agricultural, forest and seminatural areas.",
+      "type": "captioning"
+    }
+  ],
+  "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_42_48": [
+    {
+      "question": "[refer] Output a bounding box enclosing the land cover class instance found at {<93><23>} in the satellite image.",
+      "reference_output": "[0.84 0.15, 1.0 0.34]",
+      "type": "bounding box"
+    }
+  ],
+  "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_58_27": [
+    {
+      "question": "Is the area of coniferous forests greater than or equal to 40%?\nAnswer the question using a single word or phrase.",
+      "reference_output": "yes",
+      "type": "binary"
+    },
+    {
+      "question": "Can land principally occupied by agriculture with significant areas of natural vegetation be detected in the satellite image?\nAnswer the question using a single word or phrase.",
+      "reference_output": "yes",
+      "type": "binary"
+    },
+    {
+      "question": "Does the image illustrate more than two connected regions of coniferous forests?\nAnswer the question using a single word or phrase.",
+      "reference_output": "no",
+      "type": "binary"
+    }
+  ]
+}

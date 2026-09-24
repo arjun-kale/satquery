@@ -1,0 +1,15 @@
+{"ts": "2026-09-23T15:02:20+00:00", "event": "splits_built", "modal_task_id": "ta-01M37CKPCMA8N8JY142GBCE5DR", "train": {"binary": 32, "bounding box": 32, "captioning": 32, "mcq": 32}, "eval": {"binary": 10, "bounding box": 10, "captioning": 10, "mcq": 10}}
+{"ts": "2026-09-23T15:03:59+00:00", "event": "eval_done", "modal_task_id": "ta-01M37CM24TS9WMY9ZD1AYS73KR", "which": "base", "n": 40, "seconds": 55.0}
+{"ts": "2026-09-23T15:04:11+00:00", "event": "train_start", "modal_task_id": "ta-01M37CQ3WKRPYCY78A968WQ10R", "resume_from_checkpoint": null, "gpu": "NVIDIA A10"}
+{"ts": "2026-09-23T15:05:56+00:00", "event": "checkpoint_saved", "modal_task_id": "ta-01M37CQ3WKRPYCY78A968WQ10R", "step": 4, "path": "/vol/checkpoints/m2_geochat/debug/checkpoint-4", "bytes": 959920351}
+{"ts": "2026-09-23T15:08:00+00:00", "event": "discarded", "modal_task_id": null, "what": ["checkpoint-4", "loss_history.json"], "reason": "trained/logged with LLaVA built-in loss, which transformers 4.51 did not divide by grad_accum (logged loss 4x too high) and which token-weights captions ~100:1 over VQA; replaced by per-example loss. Splits and base eval kept (unaffected)."}
+{"ts": "2026-09-23T15:09:21+00:00", "event": "train_start", "modal_task_id": "ta-01M37D0K6ZT3Z0395ZQGTDHD1R", "resume_from_checkpoint": null, "gpu": "NVIDIA A10"}
+{"ts": "2026-09-23T15:11:03+00:00", "event": "checkpoint_saved", "modal_task_id": "ta-01M37D0K6ZT3Z0395ZQGTDHD1R", "step": 4, "path": "/vol/checkpoints/m2_geochat/debug/checkpoint-4", "bytes": 959920347}
+{"ts": "2026-09-23T15:13:01+00:00", "event": "train_start", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "resume_from_checkpoint": "/vol/checkpoints/m2_geochat/debug/checkpoint-4", "gpu": "NVIDIA A10G"}
+{"ts": "2026-09-23T15:15:04+00:00", "event": "resumed", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "from_checkpoint": "/vol/checkpoints/m2_geochat/debug/checkpoint-4", "global_step": 4, "loss_history_kept": 4}
+{"ts": "2026-09-23T15:16:43+00:00", "event": "checkpoint_saved", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "step": 8, "path": "/vol/checkpoints/m2_geochat/debug/checkpoint-8", "bytes": 959920974}
+{"ts": "2026-09-23T15:18:19+00:00", "event": "checkpoint_saved", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "step": 12, "path": "/vol/checkpoints/m2_geochat/debug/checkpoint-12", "bytes": 959921613}
+{"ts": "2026-09-23T15:19:56+00:00", "event": "checkpoint_saved", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "step": 16, "path": "/vol/checkpoints/m2_geochat/debug/checkpoint-16", "bytes": 959922247}
+{"ts": "2026-09-23T15:20:06+00:00", "event": "train_done", "modal_task_id": "ta-01M37D727X421RDKA0S82F9NRR", "global_step": 16, "final_adapter_bytes": 319882752, "loss_decreased": true}
+{"ts": "2026-09-23T15:21:39+00:00", "event": "eval_done", "modal_task_id": "ta-01M37DMQ1NVBA085WWWV866TMR", "which": "adapted", "n": 40, "seconds": 58.4}
+{"ts": "2026-09-23T15:21:42+00:00", "event": "pipeline_done", "modal_task_id": "ta-01M37D52WMX61YYZN9JQVKJ10R", "app_id": "ap-XI8eRa9qcCdVOInZxEQXPK"}

@@ -1,0 +1,18 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 5105,
+      "sha256": "506e01cf624790fc52c3bbcb428b3fa8040dc1167f2db4060bb09fbecc0027a8"
+    },
+    "adapter_config.json": {
+      "bytes": 835,
+      "sha256": "a093d523d5950adc6682770f5ff38a75ea01b4e1850d25fb164658711dcddc9e"
+    },
+    "adapter_model.safetensors": {
+      "bytes": 319882752,
+      "sha256": "17f6c74fc5b80befd915d4ff5d75adf988689acf4d692dae081e02518245b0fd"
+    }
+  },
+  "path": "/vol/checkpoints/m2_geochat/scaled/final",
+  "saved_at": "2026-09-23T18:03:12+00:00"
+}

@@ -1,0 +1,80 @@
+{
+  "adapter": "/vol/checkpoints/m2_geochat/debug/final",
+  "base_model": "MBZUAI/geochat-7B@cca91eb4c40d833c60579a5af95a7514181fe291 (converted to llava-hf; verification passed)",
+  "eval_split": "BigEarthNet.txt official test split, Lithuania/Summer, n=40",
+  "finalized_at": "2026-09-23T15:21:42+00:00",
+  "mode": "debug",
+  "table": [
+    {
+      "adapted": 0.3,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.5,
+      "delta": -0.2,
+      "metric": "VQA \u2014 binary (accuracy)",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.2,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.3,
+      "delta": -0.09999999999999998,
+      "metric": "VQA \u2014 multiple choice (accuracy)",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.0,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.0,
+      "delta": 0.0,
+      "metric": "Grounding \u2014 referring/point (Acc@0.5 IoU)",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.016764347826086955,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.0010505581089954045,
+      "delta": 0.01571378971709155,
+      "metric": "Grounding \u2014 mean IoU",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.153105268287443,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.15438520326978708,
+      "delta": -0.0012799349823440775,
+      "metric": "Captioning \u2014 ROUGE-L F1",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.0,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.0,
+      "delta": 0.0,
+      "metric": "Captioning \u2014 BLEU-4",
+      "n": 10,
+      "small_sample": true
+    },
+    {
+      "adapted": 0.0,
+      "approx_95ci_halfwidth": 0.3099032106965012,
+      "base": 0.0,
+      "delta": 0.0,
+      "metric": "Captioning \u2014 LULC-class F1",
+      "n": 10,
+      "small_sample": true
+    }
+  ],
+  "table_markdown": "| Benchmark (held-out BigEarthNet.txt test split) | Base model (GeoChat-7B) | Post-adaptation (GeoChat-7B + M2 LoRA) | \u0394 | n |\n|---|---|---|---|---|\n| VQA \u2014 binary (accuracy) | 0.500 | 0.300 | -0.200 | 10 \u26a0 small n |\n| VQA \u2014 multiple choice (accuracy) | 0.300 | 0.200 | -0.100 | 10 \u26a0 small n |\n| Grounding \u2014 referring/point (Acc@0.5 IoU) | 0.000 | 0.000 | +0.000 | 10 \u26a0 small n |\n| Grounding \u2014 mean IoU | 0.001 | 0.017 | +0.016 | 10 \u26a0 small n |\n| Captioning \u2014 ROUGE-L F1 | 0.154 | 0.153 | -0.001 | 10 \u26a0 small n |\n| Captioning \u2014 BLEU-4 | 0.000 | 0.000 | +0.000 | 10 \u26a0 small n |\n| Captioning \u2014 LULC-class F1 | 0.000 | 0.000 | +0.000 | 10 \u26a0 small n |",
+  "train": {
+    "global_steps": 16,
+    "loss_decreased": true,
+    "loss_first_20pct_mean": 3.1949,
+    "loss_last_20pct_mean": 0.9440666666666666,
+    "train_rows": 128
+  }
+}

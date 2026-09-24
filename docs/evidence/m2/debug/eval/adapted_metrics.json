@@ -1,0 +1,95 @@
+{
+  "adapter_sha256": "31945edc17dd47808acf1b660b90c207b3f99a1a48298d10bae0cc6619040497",
+  "decoding": "greedy",
+  "eval_manifest_hash": "6084bee79da77bb6",
+  "evaluated_at": "2026-09-23T15:21:39+00:00",
+  "metrics": {
+    "binary": {
+      "accuracy": 0.3,
+      "by_category": {
+        "adjacency": {
+          "accuracy": 0.5,
+          "n": 2
+        },
+        "area": {
+          "accuracy": 0.5,
+          "n": 2
+        },
+        "count": {
+          "accuracy": 0.0,
+          "n": 3
+        },
+        "presence": {
+          "accuracy": 0.3333333333333333,
+          "n": 3
+        }
+      },
+      "n": 10
+    },
+    "bounding box": {
+      "acc_at_0.5_iou": 0.0,
+      "by_category": {
+        "point": {
+          "accuracy": 0.0,
+          "n": 5
+        },
+        "reference": {
+          "accuracy": 0.0,
+          "n": 5
+        }
+      },
+      "mean_iou": 0.016764347826086955,
+      "n": 10,
+      "parse_rate": 0.6
+    },
+    "captioning": {
+      "bleu4": 0.0,
+      "lulc_f1": 0.0,
+      "n": 10,
+      "rouge_l": 0.153105268287443
+    },
+    "mcq": {
+      "accuracy": 0.2,
+      "by_category": {
+        "adjacency": {
+          "accuracy": 0.0,
+          "n": 1
+        },
+        "area": {
+          "accuracy": 0.0,
+          "n": 1
+        },
+        "climate zone": {
+          "accuracy": 0.0,
+          "n": 1
+        },
+        "count": {
+          "accuracy": 0.0,
+          "n": 1
+        },
+        "country": {
+          "accuracy": 0.0,
+          "n": 1
+        },
+        "presence": {
+          "accuracy": 0.5,
+          "n": 2
+        },
+        "relative pos": {
+          "accuracy": 1.0,
+          "n": 1
+        },
+        "season": {
+          "accuracy": 0.0,
+          "n": 2
+        }
+      },
+      "n": 10
+    }
+  },
+  "mode": "debug",
+  "n": 40,
+  "quantization": "4-bit NF4 (same as training)",
+  "seconds": 58.4,
+  "which": "adapted"
+}

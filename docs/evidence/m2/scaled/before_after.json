@@ -1,0 +1,92 @@
+[
+  {
+    "metric": "VQA \u2014 binary (accuracy)",
+    "base": 0.55,
+    "adapted": 0.73,
+    "delta": 0.17999999999999994,
+    "n": 100,
+    "trivial_baseline": 0.52,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  },
+  {
+    "metric": "VQA \u2014 multiple choice (accuracy)",
+    "base": 0.27,
+    "adapted": 0.77,
+    "delta": 0.5,
+    "n": 100,
+    "trivial_baseline": 0.31,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  },
+  {
+    "metric": "VQA \u2014 multiple choice, image-dependent categories only (accuracy)",
+    "base": 0.3220338983050847,
+    "adapted": 0.6101694915254238,
+    "delta": 0.28813559322033905,
+    "n": 59,
+    "trivial_baseline": 0.2711864406779661,
+    "approx_95ci_halfwidth": 0.12758513276120736,
+    "small_sample": true
+  },
+  {
+    "metric": "Grounding \u2014 point-prompted (Acc@0.5 IoU)",
+    "base": 0.0,
+    "adapted": 0.8431372549019608,
+    "delta": 0.8431372549019608,
+    "n": 51,
+    "trivial_baseline": 0.11764705882352941,
+    "approx_95ci_halfwidth": 0.13722744823474495,
+    "small_sample": true
+  },
+  {
+    "metric": "Grounding \u2014 referring expression (Acc@0.5 IoU)",
+    "base": 0.02040816326530612,
+    "adapted": 0.2653061224489796,
+    "delta": 0.2448979591836735,
+    "n": 49,
+    "trivial_baseline": 0.2653061224489796,
+    "approx_95ci_halfwidth": 0.13999999999999999,
+    "small_sample": true
+  },
+  {
+    "metric": "Grounding \u2014 mean IoU, all",
+    "base": 0.06697449587185862,
+    "adapted": 0.5009847290421787,
+    "delta": 0.4340102331703201,
+    "n": 100,
+    "trivial_baseline": 0.270626,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  },
+  {
+    "metric": "Captioning \u2014 ROUGE-L F1",
+    "base": 0.13768895384325783,
+    "adapted": 0.4907631967296841,
+    "delta": 0.3530742428864263,
+    "n": 100,
+    "trivial_baseline": null,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  },
+  {
+    "metric": "Captioning \u2014 BLEU-4",
+    "base": 0.006996846270707031,
+    "adapted": 0.28959885988804257,
+    "delta": 0.28260201361733556,
+    "n": 100,
+    "trivial_baseline": null,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  },
+  {
+    "metric": "Captioning \u2014 LULC-class F1",
+    "base": 0.0,
+    "adapted": 0.4939379509379509,
+    "delta": 0.4939379509379509,
+    "n": 100,
+    "trivial_baseline": null,
+    "approx_95ci_halfwidth": 0.098,
+    "small_sample": false
+  }
+]

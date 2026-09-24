@@ -1,0 +1,82 @@
+{
+  "annotations": "BIFOLD-BigEarthNetv2-0/BigEarthNet.txt@72d865f2146f0a85b720f7f3ca1cdbaeafc3d316 (BigEarthNet.txt.parquet)",
+  "eval": {
+    "by_task_family": {
+      "VQA": 200,
+      "captioning": 100,
+      "grounding": 100
+    },
+    "by_type": {
+      "binary": 100,
+      "bounding box": 100,
+      "captioning": 100,
+      "mcq": 100
+    },
+    "by_type_category": {
+      "binary / adjacency": 25,
+      "binary / area": 25,
+      "binary / count": 25,
+      "binary / presence": 25,
+      "bounding box / point": 51,
+      "bounding box / reference": 49,
+      "captioning / None": 100,
+      "mcq / adjacency": 13,
+      "mcq / area": 13,
+      "mcq / climate zone": 13,
+      "mcq / count": 13,
+      "mcq / country": 14,
+      "mcq / presence": 14,
+      "mcq / relative pos": 6,
+      "mcq / season": 14
+    },
+    "manifest_hash": "5730aae829fa4285",
+    "n": 400,
+    "unique_patches": 251
+  },
+  "eval_source_split": "test",
+  "filters": {
+    "country": "Lithuania",
+    "season": "Summer"
+  },
+  "imagery": "hackelle/BigEarthNetV2-Lithuania-Summer-LMDB (Sentinel-2 B04/B03/B02, 120x120 @10m)",
+  "patches_in_filter": 8363,
+  "patches_with_imagery": 8363,
+  "rows_without_imagery_dropped": 0,
+  "seed": 42,
+  "source_rows": 185443,
+  "train": {
+    "by_task_family": {
+      "VQA": 1600,
+      "captioning": 800,
+      "grounding": 800
+    },
+    "by_type": {
+      "binary": 800,
+      "bounding box": 800,
+      "captioning": 800,
+      "mcq": 800
+    },
+    "by_type_category": {
+      "binary / adjacency": 184,
+      "binary / area": 205,
+      "binary / count": 205,
+      "binary / presence": 206,
+      "bounding box / point": 407,
+      "bounding box / reference": 393,
+      "captioning / None": 800,
+      "mcq / adjacency": 89,
+      "mcq / area": 112,
+      "mcq / climate zone": 112,
+      "mcq / count": 112,
+      "mcq / country": 112,
+      "mcq / presence": 112,
+      "mcq / relative pos": 38,
+      "mcq / season": 113
+    },
+    "manifest_hash": "7edfddd534b2e9f5",
+    "n": 3200,
+    "unique_patches": 1669
+  },
+  "train_eval_patch_overlap": 0,
+  "train_source_split": "train"
+}

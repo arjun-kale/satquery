@@ -1,0 +1,52 @@
+{
+  "checks": [
+    {
+      "argmax_identical": true,
+      "converted_4bit_text": "Yes",
+      "converted_text": "Yes",
+      "generation_identical": true,
+      "input_ids_first_mismatch": null,
+      "input_ids_identical": true,
+      "logits_cosine": 0.9999992251396179,
+      "logits_max_abs_diff": 0.015625,
+      "pixel_max_abs_diff": 0.0008864402770996094,
+      "question": "Is there any coniferous forest in this image?\nAnswer the question using a single word or phrase.",
+      "reference_text": "Yes",
+      "top5_overlap": 5
+    },
+    {
+      "argmax_identical": true,
+      "converted_4bit_text": "{<17><58><33><82>|<90>}",
+      "converted_text": "{<17><61><33><85>|<90>}",
+      "generation_identical": true,
+      "input_ids_first_mismatch": null,
+      "input_ids_identical": true,
+      "logits_cosine": 0.9999698400497437,
+      "logits_max_abs_diff": 0.078125,
+      "pixel_max_abs_diff": 0.0008864402770996094,
+      "question": "[refer] Where can the <p>pastures</p> be found?",
+      "reference_text": "{<17><61><33><85>|<90>}",
+      "top5_overlap": 5
+    },
+    {
+      "argmax_identical": true,
+      "converted_4bit_text": "In the satellite image, there are <p>some buildings</p> {<81><8><100><24>|<90>}<delim>{",
+      "converted_text": "The satellite image depicts a single large ground-track field in the center of the image. The field is likely used for agricultural purposes, such as growing crops or raising livestock",
+      "generation_identical": true,
+      "input_ids_first_mismatch": null,
+      "input_ids_identical": true,
+      "logits_cosine": 0.9999868869781494,
+      "logits_max_abs_diff": 0.046875,
+      "pixel_max_abs_diff": 0.0008864402770996094,
+      "question": "Describe this satellite image.",
+      "reference_text": "The satellite image depicts a single large ground-track field in the center of the image. The field is likely used for agricultural purposes, such as growing crops or raising livestock",
+      "top5_overlap": 5
+    }
+  ],
+  "converted": "llava-hf layout, transformers 4.51.3, fp16 (4-bit output recorded for information)",
+  "criteria": "identical input ids; pixel max|diff|<1e-2; identical next-token argmax; logits cosine>0.995",
+  "passed": true,
+  "reference": "github.com/mbzuai-oryx/GeoChat@4850920e005a849bd224d0ce35aa9db031fa5155 with transformers 4.31.0, fp16",
+  "sample_patch": "S2A_MSIL2A_20170720T100031_N9999_R122_T34UDG_61_54",
+  "verified_at": "2026-09-23T14:59:49+00:00"
+}

@@ -1,0 +1,49 @@
+{
+  "config": {
+    "batch_size": 2,
+    "epochs": 1,
+    "grad_accum": 8,
+    "lr": 0.0001,
+    "n_eval": 400,
+    "n_train": 3200,
+    "save_every_min": 10,
+    "save_steps": 10
+  },
+  "effective_batch": 16,
+  "epochs": 1,
+  "global_steps": 200,
+  "lora": {
+    "lora_alpha": 64,
+    "lora_dropout": 0.05,
+    "modules": [
+      "down_proj",
+      "gate_proj",
+      "k_proj",
+      "o_proj",
+      "q_proj",
+      "up_proj",
+      "v_proj"
+    ],
+    "r": 32,
+    "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
+  },
+  "loss_any_nan": false,
+  "loss_decreased": true,
+  "loss_first_20pct_mean": 0.9574999999999999,
+  "loss_last_20pct_mean": 0.3902074999999999,
+  "mode": "scaled",
+  "resumed_from_checkpoint": "/vol/checkpoints/m2_geochat/scaled/checkpoint-180",
+  "this_segment_seconds": 813.0,
+  "total_params": 7144118272,
+  "train_rows": 3200,
+  "train_tokens_per_epoch": 4563152,
+  "trainable_params": 79953920,
+  "trainer_metrics_this_segment": {
+    "epoch": 1.0,
+    "total_flos": 1.97090597822976e+17,
+    "train_loss": 0.040490880012512206,
+    "train_runtime": 807.7705,
+    "train_samples_per_second": 3.962,
+    "train_steps_per_second": 0.248
+  }
+}

@@ -1,0 +1,40 @@
+[
+  {
+    "patch_id": "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_33_37",
+    "caption": "This satellite image, captured during the summer in Lithuania, showcases a predominantly forested landscape within the \"cold, no dry season, warm summer\" climate zone. The dominant feature is the expansive coniferous forest, covering approximately 1,000,000 square meters. It is bordered by a smaller mixed forest, spanning around 160,000 square meters. The coniferous forest shares a border with the mixed forest, indicating a diverse forest ecosystem.",
+    "caption_confidence": 0.8134344050485806,
+    "seconds_first_call": 47.2,
+    "grounding": {
+      "phrase": "transitional woodlands or shrubs",
+      "reference": "[0.13 0.0, 0.47 0.16]",
+      "boxes": [
+        {
+          "label": "transitional woodlands or shrubs",
+          "confidence": 0.80679444593015,
+          "x_min": 0.0,
+          "y_min": 0.0,
+          "x_max": 1.0,
+          "y_max": 1.0
+        }
+      ]
+    }
+  },
+  {
+    "patch_id": "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_42_48",
+    "caption": "This satellite image, captured during the summer in Lithuania, showcases a diverse landscape within the \"cold, no dry season, warm summer\" climate zone. The dominant feature is the expansive coniferous forest, covering approximately 700,000 square meters, which is distributed across two areas, one large (~690,000 sqm) and one marginal. The coniferous forest borders arable land (~360,000 sqm), which is also distributed over two areas, one large (~359,000 sqm) and one marginal. The arable land is adjacent to complex cultivation patterns (~359,000 sqm), which are spread over two areas, one large (~358,000 sqm) and one marginal. The complex cultivation patterns are next to a small patch of land principally occupied by agriculture with significant areas of natural vegetation, covering less than 5% of the total area (~72,000 sqm). The arable land is also adjacent to a small patch of land principally occupied by agriculture with significant areas of natural vegetation. The landscape is characterized by a mix of forest and seminatural areas, agricultural areas, and artificial surfaces, highlighting the varied ecosystems present in this region.",
+    "caption_confidence": 0.7853717186088411,
+    "seconds_first_call": 21.8
+  },
+  {
+    "patch_id": "S2B_MSIL2A_20170808T094029_N9999_R036_T35ULA_58_27",
+    "caption": "This satellite image, captured during the summer in Lithuania, showcases a predominantly forested landscape within the \"cold, no dry season, warm summer\" climate zone. The dominant feature is the expansive coniferous forest, covering approximately 1,000,000 square meters. It is bordered by a smaller mixed forest, spanning around 160,000 square meters, and a marginal body of inland waters, which accounts for less than 5% of the total area (72,000 square meters). The coniferous forest shares a border with the mixed forest, indicating a diverse forest ecosystem.",
+    "caption_confidence": 0.8103164538753393,
+    "seconds_first_call": 12.8,
+    "vqa": {
+      "question": "Is the area of coniferous forests greater than or equal to 40%?\nAnswer the question using a single word or phrase.",
+      "reference": "yes",
+      "answer": "yes",
+      "confidence": 0.647288257622832
+    }
+  }
+]
