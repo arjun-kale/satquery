@@ -46,3 +46,25 @@ Record the outcome in `docs/STATUS.md` when Phase 2 begins.
 
 **Status:** Deferred. Use public staged samples for the MVP.
 No credentials required for Phase 0–1.
+
+---
+
+## Evidence UI: gaps against `SATQUERY_UX_BRIEF.md`
+
+**Status:** Open. The redesigned UI renders honest fallbacks for each of these; none is faked.
+
+- **Streaming (§8):** the UI polls `GET /api/jobs/{id}/trace`, which the executor rewrites after
+  every step, instead of the AI SDK UI Message Stream over SSE. Every row is still a recorded
+  backend state change, but granularity is per step (no `data-progress` tile counts, no
+  cold-start event: the UI only says the GPU worker *may* be starting after 15 s on a VLM step).
+- **Stop (§8.5):** `POST /api/jobs/{id}/cancel` stops the run *before the next step*; a step that
+  is already running (e.g. a Modal GPU call) finishes first. The UI labels Stop that way.
+- **Placeholder steps:** `sar_calibrate`, `sar_despeckle`, `mndwi` and `geochat_summary` return
+  `{"simulated": true}` — no computation runs. The UI marks them "Placeholder step". The SAR DAG
+  needs calibration metadata before these can be wired to `app/tools/sar.py`.
+- **ChangeFormer:** no weights are loaded, so change detection only works in mock mode (fixed
+  placeholder mask, labelled as such). In `modal` mode the step fails with a plain message.
+- **Persistence:** analyses are restored from the backend's own traces, keyed by ids kept in the
+  browser (`localStorage`), not an SQLite analyses table.
+- **Pixel values under the cursor / σ⁰ readout:** not available — the browser only has the 512 px
+  quick-look, so the readout shows pixel coordinates and lat/lon only.
