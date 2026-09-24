@@ -1,60 +1,214 @@
 @import "tailwindcss";
 @import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
 @import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/600.css";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "@fontsource/jetbrains-mono/500.css";
 
-@custom-variant dark (&:is(.dark *));
-
+/*
+ * SatQuery tokens (UX brief §9). Scientific, instrument-grade: calm chrome, imagery in charge.
+ * Every colour means exactly one thing:
+ *   optical / sar  → only on optical or SAR scene & layer tags
+ *   evidence       → evidence brackets and outlines (always with --halo)
+ *   evidence-active→ only the currently focused evidence
+ *   change         → only change-mask outlines
+ *   accent         → primary action and focus ring
+ */
 @theme {
+  --color-base: #0a0e14;
+  --color-panel: #10151d;
+  --color-raised: #161c26;
+  --color-hover: #1c2330;
+  --color-line: #232b37;
+  --color-line-strong: #2f3947;
+
+  --color-fg: #e6eaf0;
+  --color-fg-muted: #9aa4b2;
+  --color-fg-faint: #6b7584;
+
+  --color-optical: #22d3ee;
+  --color-sar: #c084fc;
+  --color-evidence: #f8fafc;
+  --color-evidence-active: #fde047;
+  --color-change: #fb923c;
+  --color-halo: rgb(0 0 0 / 0.75);
+  --color-scrim: rgb(5 8 12 / 0.55);
+
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-critical: #ef4444;
+
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Instrument Panel Dark Mode Tokens */
-  --color-background: #0f1115;
-  --color-foreground: #e2e8f0;
+  /* Type scale 13 / 14 (body) / 16 / 20 / 24 */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 21px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
 
-  --color-card: #15181e;
-  --color-card-foreground: #e2e8f0;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
-  --color-popover: #15181e;
-  --color-popover-foreground: #e2e8f0;
-
-  --color-primary: #06b6d4; /* Cyan 500 for optical markers */
-  --color-primary-foreground: #000000;
-
-  --color-secondary: #8b5cf6; /* Violet 500 for SAR markers */
-  --color-secondary-foreground: #ffffff;
-
-  --color-muted: #1e2329;
-  --color-muted-foreground: #94a3b8;
-
-  --color-accent: #1e2329;
-  --color-accent-foreground: #e2e8f0;
-
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #ffffff;
-
-  --color-border: #2a313c;
-  --color-input: #1e2329;
-  --color-ring: #06b6d4;
-
-  --radius-lg: 0px;
-  --radius-md: 0px;
-  --radius-sm: 0px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 240ms;
+  --duration-slow: 300ms;
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary selection:text-primary-foreground;
-  }
-  
   :root {
     color-scheme: dark;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-base);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    border-color: var(--color-line);
+  }
+
+  /* One focus ring everywhere (keyboard only). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(59 130 246 / 0.35);
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* ---- Motion: every animation explains an arrival or a state change ---- */
+
+/* Evidence draws on when it arrives (brackets extend, contours trace). */
+@keyframes draw-on {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Only the `from` state is declared, so each group settles at its own opacity attribute. */
+@keyframes evidence-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.evidence-arrive {
+  transform-box: view-box;
+  animation: evidence-in var(--duration-base) var(--ease-out) backwards;
+}
+
+/* Active run step: the label shimmers while real work is in flight. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+      90deg,
+      var(--color-fg-muted) 0%,
+      var(--color-fg) 45%,
+      var(--color-fg-muted) 90%
+    )
+    0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up var(--duration-base) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .shimmer-text {
+    animation: none;
+    background: none;
+    color: var(--color-fg);
   }
 }
