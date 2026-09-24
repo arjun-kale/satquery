@@ -75,6 +75,7 @@ export function ConversationPanel({
         set={set}
         hasAnalyses={thread.length > 0}
         running={!!running}
+        stopping={!!running?.stopRequested}
         disabledReason={disabledReason}
         onAsk={(q) => onAsk(q)}
         onStop={() => running && onStop(running.localId)}

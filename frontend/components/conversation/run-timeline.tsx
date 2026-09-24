@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Square, WifiOff } from "lucide-react";
+import { ChevronRight, Loader2, Square, WifiOff } from "lucide-react";
 import { useState } from "react";
 import { deriveTimeline, expertCount, isActivePhase, runPhase, type TimelineRow } from "@/lib/analysis";
 import { formatSeconds } from "@/lib/geo";
@@ -83,8 +83,8 @@ export function RunTimeline({ analysis, set, onStop }: { analysis: Analysis; set
         </button>
         {active && analysis.jobId && (
           <Button size="sm" variant="danger" className="ml-auto" onClick={onStop} disabled={analysis.stopRequested} title="Stops before the next step; a step already running finishes first">
-            <Square className="fill-current" />
-            {analysis.stopRequested ? "Stopping" : "Stop"}
+            {analysis.stopRequested ? <Loader2 className="animate-spin" /> : <Square className="fill-current" />}
+            {analysis.stopRequested ? "Stopping after current step…" : "Stop"}
           </Button>
         )}
       </div>

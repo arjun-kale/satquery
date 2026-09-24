@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Loader2, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatDate } from "@/lib/geo";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ export function PromptBox({
   set,
   hasAnalyses,
   running,
+  stopping,
   disabledReason,
   onAsk,
   onStop,
@@ -44,6 +45,8 @@ export function PromptBox({
   set: SceneSet | null;
   hasAnalyses: boolean;
   running: boolean;
+  /** Stop was pressed; the step already running finishes before the run halts. */
+  stopping: boolean;
   disabledReason: string | null;
   onAsk: (q: string) => void;
   onStop: () => void;
@@ -141,8 +144,18 @@ export function PromptBox({
             )}
           </span>
           {running ? (
-            <Button type="button" size="sm" variant="danger" className="ml-auto" onClick={onStop} title="Stop (Esc)">
-              <Square className="fill-current" /> Stop
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              className="ml-auto"
+              onClick={onStop}
+              disabled={stopping}
+              aria-live="polite"
+              title={stopping ? "The step already running finishes first" : "Stop (Esc) — stops before the next step"}
+            >
+              {stopping ? <Loader2 className="animate-spin" /> : <Square className="fill-current" />}
+              {stopping ? "Stopping after current step…" : "Stop"}
             </Button>
           ) : (
             <Button type="submit" size="sm" variant="primary" className="ml-auto" disabled={!set || !draft.trim() || !!disabledReason}>
