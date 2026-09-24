@@ -44,6 +44,14 @@ class RasterMetadata(BaseModel):
     extent_wgs84: list[float] | None = Field(
         None, description="[west, south, east, north] in WGS-84."
     )
+    corners_wgs84: list[list[float]] | None = Field(
+        None,
+        description="[lon, lat] of the UL, UR, LR, LL pixel corners, for pixel → geo readouts.",
+    )
+    modality: Literal["optical", "sar", "unknown"] = Field(
+        "unknown", description="Declared by file tags only; 'unknown' when the metadata doesn't say."
+    )
+    acquired_at: str | None = Field(None, description="Acquisition date from file tags, if present.")
     nodata: float | None = None
     sensor_tags: dict[str, str] = Field(default_factory=dict)
     preview_band_map: str | None = Field(

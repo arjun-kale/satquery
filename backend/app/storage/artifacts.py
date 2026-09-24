@@ -21,6 +21,21 @@ class ArtifactRepository:
     def upload_path(self, image_id: str, suffix: str = ".tif") -> Path:
         return self.uploads_dir / f"{image_id}{suffix}"
 
+    def find_upload(self, image_id: str) -> Path:
+        """The stored raster for *image_id*, whatever suffix it was uploaded with."""
+        for path in self.uploads_dir.glob(f"{image_id}.*"):
+            if path.suffix != ".json":
+                return path
+        raise FileNotFoundError(f"Uploaded file not found for image {image_id!r}")
+
+    def metadata_path(self, image_id: str) -> Path:
+        return self.uploads_dir / f"{image_id}.json"
+
+    def preview_path(self, image_id: str) -> Path:
+        previews = self.uploads_dir.parent / "previews"
+        previews.mkdir(parents=True, exist_ok=True)
+        return previews / f"{image_id}.png"
+
     def artifact_path(self, job_id: str, name: str) -> Path:
         job_dir = self.artifacts_dir / job_id
         job_dir.mkdir(parents=True, exist_ok=True)

@@ -66,6 +66,7 @@ def _extract(ds: Any, image_id: str, filename: str, checksum: str) -> RasterMeta
     extent_wgs84: list[float] | None = None
     is_georeferenced = crs is not None
 
+    corners_wgs84: list[list[float]] | None = None
     if crs and transform:
         gsd_m = _gsd_metres(transform, crs)
         try:
@@ -73,12 +74,17 @@ def _extract(ds: Any, image_id: str, filename: str, checksum: str) -> RasterMeta
                 crs, "EPSG:4326", *ds.bounds
             )
             extent_wgs84 = [west, south, east, north]
+            corners_wgs84 = _corners_wgs84(transform, ds.width, ds.height, crs)
         except Exception:
             extent_wgs84 = None
 
+    tags = ds.tags()
     sensor_tags: dict[str, str] = {}
-    for key in ("TIFFTAG_IMAGEDESCRIPTION", "satellite", "sensor", "SENSOR"):
-        val = ds.tags().get(key)
+    for key in (
+        "TIFFTAG_IMAGEDESCRIPTION", "satellite", "sensor", "SENSOR",
+        "modality", "polarisation", "acquired_at", "source", "license",
+    ):
+        val = tags.get(key)
         if val:
             sensor_tags[key] = val
 
@@ -99,6 +105,9 @@ def _extract(ds: Any, image_id: str, filename: str, checksum: str) -> RasterMeta
         crs=crs_str,
         gsd_m=gsd_m,
         extent_wgs84=extent_wgs84,
+        corners_wgs84=corners_wgs84,
+        modality=_modality(tags),
+        acquired_at=tags.get("acquired_at") or tags.get("ACQUISITION_DATE"),
         nodata=ds.nodata,
         sensor_tags=sensor_tags,
         preview_band_map=preview_band_map,
@@ -124,6 +133,30 @@ def _gsd_metres(transform: Any, crs: CRS) -> float:
         pixel_size = pixel_size * metre_per_deg
 
     return round(pixel_size, 4)
+
+
+def _corners_wgs84(transform: Any, width: int, height: int, crs: CRS) -> list[list[float]]:
+    """[lon, lat] of the four outer pixel corners, clockwise from upper-left."""
+    proj = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+    corners = []
+    for col, row in ((0, 0), (width, 0), (width, height), (0, height)):
+        x, y = transform @ (col, row)
+        lon, lat = proj.transform(x, y)
+        corners.append([round(lon, 8), round(lat, 8)])
+    return corners
+
+
+def _modality(tags: dict[str, str]) -> str:
+    """Only trust what the file declares; never guess modality from pixel statistics."""
+    declared = (tags.get("modality") or "").lower()
+    if declared in ("optical", "sar"):
+        return declared
+    sensor = " ".join(tags.get(k, "") for k in ("sensor", "SENSOR", "satellite")).lower()
+    if any(s in sensor for s in ("sentinel-1", "sar", "risat", "eos-04")):
+        return "sar"
+    if any(s in sensor for s in ("sentinel-2", "landsat", "liss", "cartosat", "resourcesat")):
+        return "optical"
+    return "unknown"
 
 
 def _sha256(data: bytes) -> str:
