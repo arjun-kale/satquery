@@ -31,6 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         artifact_repo.initialize()
 
         app.state.settings = active_settings
+        from app.assets import ensure_assets_in_background
+        ensure_assets_in_background(active_settings)
         app.state.job_repository = repository
         app.state.artifact_repository = artifact_repo
         yield

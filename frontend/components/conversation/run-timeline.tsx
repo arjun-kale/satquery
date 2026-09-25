@@ -104,7 +104,7 @@ export function RunTimeline({ analysis, set, onStop }: { analysis: Analysis; set
         />
         <RoutingRow analysis={analysis} active={active} />
         {rows.map((r) => (
-          <StepRow key={r.key} row={r} now={now} coldStartPossible={trace?.model_mode === "modal"} />
+          <StepRow key={r.key} row={r} now={now} coldStartPossible={trace?.model_mode === "modal" || trace?.model_mode === "hf"} />
         ))}
       </ol>
 
@@ -173,9 +173,11 @@ function StepRow({ row, now, coldStartPossible }: { row: TimelineRow; now: numbe
       error={row.error}
       faint={row.status === "pending" || row.status === "skipped"}
       note={
-        row.status === "active" && row.model && coldStartPossible && liveMs != null && liveMs > COLD_START_HINT_MS
-          ? "The GPU worker may be starting — a first run can take a minute or two."
-          : undefined
+        row.wakeS
+          ? `The GPU engine was asleep and took ${Math.round(row.wakeS)} s to start.`
+          : row.status === "active" && row.model && coldStartPossible && liveMs != null && liveMs > COLD_START_HINT_MS
+            ? "The GPU engine may be starting — a first run can take a few minutes."
+            : undefined
       }
     />
   );

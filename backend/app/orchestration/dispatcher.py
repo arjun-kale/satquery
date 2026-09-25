@@ -278,9 +278,9 @@ def _get_model_adapter(model_mode: str):
     if model_mode == "mock":
         from app.models.mock import MockModelAdapter
         return MockModelAdapter()
-    elif model_mode == "modal":
+    elif model_mode in ("modal", "hf"):
         from app.models.geochat import GeoChatAdapter
-        return GeoChatAdapter(mode="modal")
+        return GeoChatAdapter(mode=model_mode)
     else:
         from app.models.geochat import GeoChatAdapter
         return GeoChatAdapter(mode="local")
@@ -383,6 +383,7 @@ def dispatch_tool(
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
             "weights": result.weights,
+            "engine_wake_s": round(getattr(adapter, "last_wake_s", 0.0), 1) or None,
         }
 
     # ------------------------------------------------------------------
@@ -400,6 +401,7 @@ def dispatch_tool(
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
             "weights": result.weights,
+            "engine_wake_s": round(getattr(adapter, "last_wake_s", 0.0), 1) or None,
         }
 
     # ------------------------------------------------------------------
@@ -570,6 +572,7 @@ def dispatch_tool(
             "confidence_source": result.confidence_source,
             "model_mode": result.model_mode,
             "weights": result.weights,
+            "engine_wake_s": round(getattr(adapter, "last_wake_s", 0.0), 1) or None,
         }
 
     # ------------------------------------------------------------------

@@ -441,6 +441,8 @@ export interface TimelineRow {
   simulated: boolean;
   /** A step that decided not to act says why (e.g. input already calibrated). */
   reason: string | null;
+  /** Measured seconds the GPU endpoint needed to wake from zero before this step could run. */
+  wakeS: number | null;
   error: string | null;
 }
 
@@ -470,6 +472,7 @@ export function deriveTimeline(trace: OrchestratorTrace | null, stopped: boolean
       startedAt: step?.start_time ?? null,
       simulated: step?.outputs?.simulated === true,
       reason: typeof step?.outputs?.reason === "string" ? step.outputs.reason : null,
+      wakeS: typeof step?.outputs?.engine_wake_s === "number" ? step.outputs.engine_wake_s : null,
       error: step?.error ?? null,
     };
   });

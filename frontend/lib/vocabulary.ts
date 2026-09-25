@@ -85,4 +85,5 @@ export const MODEL_MODE_LABEL: Record<ModelMode, string> = {
   mock: "Mock models",
   local: "Local models",
   modal: "SatQuery VLM on GPU",
+  hf: "SatQuery VLM on GPU",
 };

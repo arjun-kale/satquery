@@ -71,9 +71,9 @@ export function TopBar({ report }: { report: ReportControl }) {
             </span>
           </Tip>
         )}
-        {state.health.modelMode === "modal" && (
+        {(state.health.modelMode === "modal" || state.health.modelMode === "hf") && (
           <Tag tone="neutral" className="hidden md:inline-flex">
-            {MODEL_MODE_LABEL.modal}
+            {MODEL_MODE_LABEL[state.health.modelMode]}
           </Tag>
         )}
         <span role="status" className="flex items-center gap-2 text-sm text-fg-muted">

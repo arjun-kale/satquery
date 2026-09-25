@@ -7,7 +7,7 @@
  * Keep field names identical so a diff against the Python makes drift obvious.
  */
 
-export type ModelMode = "mock" | "local" | "modal";
+export type ModelMode = "mock" | "local" | "modal" | "hf";
 
 export interface HealthResponse {
   status: "ok";

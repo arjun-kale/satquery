@@ -11,7 +11,7 @@ from app.state import JobStatus
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     database: Literal["ok"] = "ok"
-    model_mode: Literal["mock", "local", "modal"]
+    model_mode: Literal["mock", "local", "modal", "hf"]
 
 
 class ErrorResponse(BaseModel):
