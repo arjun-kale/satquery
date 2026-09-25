@@ -30,6 +30,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         artifact_repo = ArtifactRepository(active_settings.data_dir)
         artifact_repo.initialize()
 
+        from app.orchestration.recovery import fail_interrupted_jobs
+        fail_interrupted_jobs(repository, artifact_repo)
+
         app.state.settings = active_settings
         from app.assets import ensure_assets_in_background
         ensure_assets_in_background(active_settings)

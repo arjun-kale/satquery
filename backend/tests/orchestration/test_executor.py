@@ -254,3 +254,29 @@ def test_sar_without_calibration_metadata_fails_plainly(executor, job_repo, arti
     failed = trace.trace.steps[0]
     assert failed.tool_name == "sar_calibrate" and failed.status == "FAILED"
     assert "calibration_factor" in failed.error
+
+
+def test_interrupted_jobs_are_failed_at_startup(job_repo, artifact_repo):
+    """A job left EXECUTING by a crash is marked failed, and its running step says why."""
+    import json
+
+    from app.orchestration.recovery import INTERRUPTED, fail_interrupted_jobs
+
+    job = job_repo.create()
+    job_repo.transition(job.id, JobStatus.VALIDATED)
+    job_repo.transition(job.id, JobStatus.ROUTING)
+    job_repo.transition(job.id, JobStatus.EXECUTING)
+    artifact_repo.artifact_path(job.id, "trace.json").write_text(json.dumps({
+        "job_id": job.id,
+        "trace": {"steps": [{"tool_name": "preview", "status": "SUCCESS"}, {"tool_name": "changeformer", "status": "RUNNING"}]},
+    }))
+    done = job_repo.create()
+    job_repo.transition(done.id, JobStatus.REJECTED, failure_reason="Unsupported query")
+
+    assert fail_interrupted_jobs(job_repo, artifact_repo) == 1
+    assert job_repo.get(job.id).status == JobStatus.FAILED
+    assert job_repo.get(job.id).failure_reason == INTERRUPTED
+    steps = json.loads(artifact_repo.artifact_path(job.id, "trace.json").read_text())["trace"]["steps"]
+    assert steps[1]["status"] == "FAILED" and "restarted" in steps[1]["error"]
+    assert steps[0]["status"] == "SUCCESS"
+    assert job_repo.get(done.id).status == JobStatus.REJECTED  # terminal jobs are untouched

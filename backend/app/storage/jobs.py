@@ -77,6 +77,14 @@ class JobRepository:
             )
         return self.get(job_id)
 
+    def unfinished(self) -> list[JobRecord]:
+        """Jobs not in a terminal state (only meaningful at startup, when nothing is running)."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id FROM jobs WHERE status NOT IN ('COMPLETED', 'REJECTED', 'FAILED')"
+            ).fetchall()
+        return [self.get(r["id"]) for r in rows]
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
