@@ -1,0 +1,11 @@
+# Installed on top of the Inference Endpoints PyTorch image. Pinned to the versions the
+# Modal worker (modal_worker/infer.py) was built and evaluated with.
+transformers==4.51.3
+peft==0.15.2
+accelerate==1.6.0
+bitsandbytes==0.45.5
+sentencepiece==0.2.0
+protobuf
+safetensors
+pillow
+numpy
