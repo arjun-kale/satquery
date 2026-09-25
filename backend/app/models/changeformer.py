@@ -11,6 +11,7 @@ model output but outside its training distribution, and the trace says so.
 
 from __future__ import annotations
 
+import gc
 import io
 import json
 import threading
@@ -72,9 +73,16 @@ class ChangeFormerAdapter(BaseModelAdapter):
 
                 from app.models.vendor.changeformer.ChangeFormer import ChangeFormerV6
 
+                # Swap in the weights memory-mapped from the file (assign=True) instead of copying
+                # them into the freshly initialised parameters, which are then freed. This avoids
+                # holding two 164 MB copies at once on small hosts. The weights are identical to a
+                # normal load. (A meta-device shell isn't possible: the upstream constructor calls
+                # .item().)
                 net = ChangeFormerV6(embed_dim=256)
-                state = torch.load(path, map_location="cpu", weights_only=True)
-                net.load_state_dict({k.removeprefix("module."): v for k, v in state.items()})
+                state = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
+                net.load_state_dict({k.removeprefix("module."): v for k, v in state.items()}, assign=True)
+                del state
+                gc.collect()
                 _loaded[path] = net.eval()
             return _loaded[path]
 

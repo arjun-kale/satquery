@@ -7,7 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     SATQUERY_DATA_DIR=/data \
-    SATQUERY_DATABASE_PATH=/data/satquery.db
+    SATQUERY_DATABASE_PATH=/data/satquery.db \
+    # Memory: few malloc arenas and two compute threads keep PyTorch's resident set small on
+    # 1 GB hosts. Results are unchanged; only parallelism is limited.
+    MALLOC_ARENA_MAX=2 \
+    OMP_NUM_THREADS=2
 
 WORKDIR /app
 
