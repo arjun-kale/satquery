@@ -20,6 +20,7 @@ Live since 2026-09-25.
 | `SATQUERY_HF_CHANGEFORMER_REPO` | `arjun-kale/satquery-changeformer` |
 | `SATQUERY_HF_SAMPLES_REPO` | `arjun-kale/satquery-samples` |
 | `SATQUERY_CORS_ORIGINS` | `https://satcore.vercel.app` |
+| `SATQUERY_MAX_RASTER_MEGAPIXELS` | unset → 4 (fits a 1 GB service: a 4 MP two-date run peaks at ~900 MB). Raise it on a bigger plan, e.g. 30 on 8 GB. The UI reads the value from `/health`. |
 
 Set a variable without echoing it: `printf '%s' "$VALUE" | railway variables --service satquery-api --set-from-stdin NAME`.
 
