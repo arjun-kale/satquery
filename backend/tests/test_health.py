@@ -23,5 +23,5 @@ def test_health_reports_database_and_model_mode(tmp_path: Path) -> None:
     response = asyncio.run(invoke_health())
 
     assert any(getattr(route, "path", None) == "/health" for route in app.routes)
-    assert response == {"status": "ok", "database": "ok", "model_mode": "mock"}
+    assert response == {"status": "ok", "database": "ok", "model_mode": "mock", "max_raster_megapixels": 4.0}
     assert settings.database_path.exists()

@@ -8,4 +8,4 @@ def health(request: Request) -> HealthResponse:
     repository = request.app.state.job_repository
     repository.initialize()
     settings = request.app.state.settings
-    return HealthResponse(model_mode=settings.model_mode)
+    return HealthResponse(model_mode=settings.model_mode, max_raster_megapixels=settings.max_raster_megapixels)

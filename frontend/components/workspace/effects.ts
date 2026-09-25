@@ -25,7 +25,7 @@ export function useHealth() {
     const check = async () => {
       try {
         const h = await api.health(controller.signal);
-        dispatch({ type: "health", state: "online", modelMode: h.model_mode });
+        dispatch({ type: "health", state: "online", modelMode: h.model_mode, maxMegapixels: h.max_raster_megapixels });
       } catch {
         if (!controller.signal.aborted) dispatch({ type: "health", state: "offline" });
       }

@@ -24,6 +24,8 @@ interface Upload {
 
 function friendlyUploadError(e: unknown): string {
   if (!(e instanceof ApiError)) return "The upload failed.";
+  // The backend's message names the scene's size and the limit, and says to crop.
+  if (e.code === "RASTER_TOO_LARGE") return e.message;
   if (e.status === 413) return "This file is over the 500 MB limit.";
   if (e.code === "INVALID_FORMAT" && /benchmark_fixture/.test(e.message))
     return "PNG is accepted only for benchmark images. Upload the GeoTIFF to keep georeferencing.";

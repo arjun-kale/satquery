@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     hf_changeformer_repo: str | None = None  # e.g. arjun-kale/satquery-changeformer
     hf_samples_repo: str | None = None  # e.g. arjun-kale/satquery-samples (dataset)
 
+    # Largest scene accepted, in megapixels (width × height). Analysis reads full-resolution bands
+    # into memory (~80 bytes per pixel across a two-date pair), so this keeps a 1 GB host from being
+    # killed mid-run. Raise it on bigger hosts (e.g. 30 on 8 GB).
+    max_raster_megapixels: float = 4.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="SATQUERY_",

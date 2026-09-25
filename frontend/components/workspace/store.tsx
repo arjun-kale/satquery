@@ -53,7 +53,7 @@ export type ViewerMode = "swipe" | "side" | "flicker" | "blend";
 export type TraceTab = "steps" | "layers" | "json";
 
 export interface WorkspaceState {
-  health: { state: "checking" | "online" | "offline"; modelMode: ModelMode | null };
+  health: { state: "checking" | "online" | "offline"; modelMode: ModelMode | null; maxMegapixels: number | null };
   sceneSets: Record<string, SceneSet>;
   activeSceneSetId: string | null;
   analyses: Analysis[];
@@ -70,7 +70,7 @@ export interface WorkspaceState {
 }
 
 export const initialState: WorkspaceState = {
-  health: { state: "checking", modelMode: null },
+  health: { state: "checking", modelMode: null, maxMegapixels: null },
   sceneSets: {},
   activeSceneSetId: null,
   analyses: [],
@@ -85,7 +85,7 @@ export const initialState: WorkspaceState = {
 };
 
 export type Action =
-  | { type: "health"; state: WorkspaceState["health"]["state"]; modelMode?: ModelMode | null }
+  | { type: "health"; state: WorkspaceState["health"]["state"]; modelMode?: ModelMode | null; maxMegapixels?: number | null }
   | { type: "restore"; sceneSets: Record<string, SceneSet>; activeSceneSetId: string | null; analyses: Analysis[]; activeAnalysisId: string | null }
   | { type: "sceneSet/add"; sceneSet: SceneSet }
   | { type: "sceneSet/activate"; id: string }
@@ -125,7 +125,14 @@ function patchAnalysis(state: WorkspaceState, localId: string, patch: (a: Analys
 export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
   switch (action.type) {
     case "health":
-      return { ...state, health: { state: action.state, modelMode: action.modelMode ?? state.health.modelMode } };
+      return {
+        ...state,
+        health: {
+          state: action.state,
+          modelMode: action.modelMode ?? state.health.modelMode,
+          maxMegapixels: action.maxMegapixels ?? state.health.maxMegapixels,
+        },
+      };
     case "restore": {
       const { sceneSets, activeSceneSetId, analyses, activeAnalysisId } = action;
       return {

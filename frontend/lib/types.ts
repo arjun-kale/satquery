@@ -13,6 +13,7 @@ export interface HealthResponse {
   status: "ok";
   database: "ok";
   model_mode: ModelMode;
+  max_raster_megapixels: number;
 }
 
 export type Modality = "optical" | "sar" | "unknown";

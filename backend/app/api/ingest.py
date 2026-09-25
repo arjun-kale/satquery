@@ -17,16 +17,35 @@ router = APIRouter(prefix="/api", tags=["ingest"])
 _MAX_BYTES = 500 * 1024 * 1024  # 500 MB
 
 
+class RasterTooLargeError(ValueError):
+    """The scene has more pixels than this server can analyse safely."""
+
+
+def check_raster_size(width: int, height: int, max_megapixels: float | None) -> None:
+    if max_megapixels is None:
+        return
+    mp = width * height / 1e6
+    if mp > max_megapixels:
+        side = int((max_megapixels * 1e6) ** 0.5)
+        raise RasterTooLargeError(
+            f"This scene is {width:,} × {height:,} px ({mp:.1f} MP). This server analyses scenes up to "
+            f"{max_megapixels:g} MP (about {side:,} × {side:,} px). Crop the area of interest and upload again."
+        )
+
+
 def store_upload(
     artifact_repo: ArtifactRepository,
     content: bytes,
     filename: str,
     *,
     benchmark_fixture: bool = False,
+    max_megapixels: float | None = None,
 ) -> RasterMetadata:
-    """Validate, persist the raster and its metadata; raise RasterIngestError on bad content."""
+    """Validate, persist the raster and its metadata; raise RasterIngestError on bad content
+    and RasterTooLargeError when the scene exceeds the configured size."""
     image_id = artifact_repo.new_image_id()
     metadata = ingest_raster(content, filename, image_id, benchmark_fixture=benchmark_fixture)
+    check_raster_size(metadata.width, metadata.height, max_megapixels)
     suffix = "." + filename.rsplit(".", 1)[-1].lower()
     artifact_repo.upload_path(image_id, suffix).write_bytes(content)
     artifact_repo.metadata_path(image_id).write_text(metadata.model_dump_json())
@@ -50,7 +69,10 @@ async def ingest(
             content,
             file.filename or "upload",
             benchmark_fixture=benchmark_fixture,
+            max_megapixels=request.app.state.settings.max_raster_megapixels,
         )
+    except RasterTooLargeError as exc:
+        raise HTTPException(413, detail={"code": "RASTER_TOO_LARGE", "message": str(exc)})
     except RasterIngestError as exc:
         raise HTTPException(422, detail={"code": "INVALID_FORMAT", "message": str(exc)})
 

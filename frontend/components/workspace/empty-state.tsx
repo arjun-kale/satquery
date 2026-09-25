@@ -30,7 +30,10 @@ export function EmptyState() {
         <Samples offline={state.health.state === "offline"} />
 
         <p className="mt-10 text-xs leading-relaxed text-fg-faint">
-          GeoTIFF up to 500 MB. PNG and JPEG are accepted only for benchmark images, because they carry no georeferencing.
+          GeoTIFF up to 500 MB
+          {state.health.maxMegapixels != null &&
+            ` and ${state.health.maxMegapixels} megapixels per scene (about ${Math.floor(Math.sqrt(state.health.maxMegapixels * 1e6)).toLocaleString()} × ${Math.floor(Math.sqrt(state.health.maxMegapixels * 1e6)).toLocaleString()} px; crop larger scenes to the area of interest)`}
+          . PNG and JPEG are accepted only for benchmark images, because they carry no georeferencing.
           Files stay on the SatQuery backend you&apos;re connected to.
         </p>
       </div>

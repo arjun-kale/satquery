@@ -98,3 +98,22 @@ def test_native_window_is_unresampled_and_transparent_outside(tmp_path):
         img = PILImage.open(io.BytesIO(edge.content))
         assert img.getpixel((15, 15))[3] == 0  # pixel (39, 39) is outside the 32×32 scene
         assert img.getpixel((0, 0))[3] == 255
+
+
+def test_oversized_scene_is_refused_with_a_clear_message(tmp_path):
+    settings = Settings(data_dir=tmp_path, database_path=tmp_path / "db.sqlite", model_mode="mock",
+                        max_raster_megapixels=0.0005)  # 500 px: the 32×32 test scene (1,024 px) is too big
+    with TestClient(create_app(settings)) as client:
+        r = client.post("/api/ingest", files={"file": ("big.tif", _tif(), "image/tiff")})
+        assert r.status_code == 413
+        detail = r.json()["detail"]
+        assert detail["code"] == "RASTER_TOO_LARGE"
+        assert "32 × 32 px" in detail["message"] and "Crop the area of interest" in detail["message"]
+        assert not list((tmp_path / "uploads").glob("*.tif"))  # nothing stored
+
+
+def test_scene_within_limit_is_accepted(tmp_path):
+    settings = Settings(data_dir=tmp_path, database_path=tmp_path / "db.sqlite", model_mode="mock",
+                        max_raster_megapixels=0.002)
+    with TestClient(create_app(settings)) as client:
+        assert client.post("/api/ingest", files={"file": ("ok.tif", _tif(), "image/tiff")}).status_code == 200

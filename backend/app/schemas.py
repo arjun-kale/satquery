@@ -12,6 +12,7 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     database: Literal["ok"] = "ok"
     model_mode: Literal["mock", "local", "modal", "hf"]
+    max_raster_megapixels: float
 
 
 class ErrorResponse(BaseModel):
